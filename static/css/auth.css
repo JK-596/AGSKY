@@ -1,0 +1,222 @@
+/* ═══════════════════════════════════════════════════
+   AGSKY — AUTH PAGE STYLES
+   ═══════════════════════════════════════════════════ */
+
+.auth-wrap {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(45,80,22,0.06) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(217,119,6,0.06) 0%, transparent 50%),
+    var(--cream);
+}
+
+.auth-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 28px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.06);
+  width: 100%;
+  max-width: 440px;
+  animation: slideUp 0.4s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-header .icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.auth-header h1 {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--forest);
+  margin-bottom: 6px;
+}
+
+.auth-header .tagline {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── Tab switcher (Sign In / Sign Up) ── */
+.auth-tabs {
+  display: flex;
+  background: var(--cream);
+  border-radius: 100px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.25s;
+  font-family: inherit;
+}
+
+.auth-tab.active {
+  background: var(--forest);
+  color: var(--cream);
+  box-shadow: 0 2px 8px rgba(45,80,22,0.2);
+}
+
+/* ── Forms ── */
+.auth-form {
+  display: none;
+}
+.auth-form.active {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+.section-header {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--forest);
+  margin: 20px 0 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-header:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* ── Radio buttons (Land Type) ── */
+.radio-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.radio-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+}
+
+.radio-option .radio-label {
+  display: block;
+  padding: 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-dark);
+  background: var(--cream);
+  transition: all 0.2s;
+}
+
+.radio-option input[type="radio"]:checked + .radio-label {
+  border-color: var(--forest);
+  background: var(--forest-bg);
+  color: var(--forest);
+}
+
+.radio-option .sub-text {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 3px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Submit button ── */
+.btn-submit {
+  width: 100%;
+  background: var(--forest);
+  color: var(--cream);
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s;
+  font-family: inherit;
+  letter-spacing: 0.5px;
+}
+.btn-submit:hover {
+  background: var(--forest-light);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(45,80,22,0.25);
+}
+.btn-submit:disabled {
+  background: var(--text-light);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Switch link ── */
+.auth-switch {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.auth-switch a {
+  color: var(--forest);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.auth-switch a:hover {
+  text-decoration: underline;
+}
+
+/* ── Error / success messages ── */
+.auth-message {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  display: none;
+}
+.auth-message.show { display: block; }
+.auth-message.error {
+  background: var(--status-crit-bg);
+  color: var(--status-crit-text);
+  border: 1px solid rgba(153,27,27,0.2);
+}
+.auth-message.success {
+  background: var(--status-good-bg);
+  color: var(--status-good-text);
+  border: 1px solid rgba(22,101,52,0.2);
+}

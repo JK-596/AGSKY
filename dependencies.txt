@@ -1,0 +1,7 @@
+pip install pymongo
+
+pip install flask matplotlib
+
+pip install requests
+
+pip install earthengine-api

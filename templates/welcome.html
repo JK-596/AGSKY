@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AGSKY — AI Farm Management</title>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', 'Noto Sans Tamil', sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Animated background gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(76, 175, 80, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(33, 150, 243, 0.1) 0%, transparent 40%);
+      z-index: -1;
+    }
+
+    /* Grid pattern background */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image:
+        linear-gradient(rgba(76, 175, 80, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(76, 175, 80, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── TOP BAR ── */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #4caf50;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lang-selector {
+      display: flex;
+      gap: 8px;
+    }
+
+    .lang-btn {
+      background: transparent;
+      border: 1px solid #2a2a2a;
+      color: #888;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .lang-btn:hover { border-color: #4caf50; color: #fff; }
+    .lang-btn.active {
+      background: #4caf50;
+      color: #000;
+      border-color: #4caf50;
+      font-weight: 600;
+    }
+
+    /* ── HERO SECTION ── */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 20px;
+      animation: fadeInUp 0.8s ease-out;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0px); }
+      50%     { transform: translateY(-10px); }
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #4caf50 0%, #81c784 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+
+    .hero .subtitle {
+      font-size: 18px;
+      color: #aaa;
+      margin-bottom: 8px;
+      font-weight: 400;
+    }
+
+    .hero .tagline {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 40px;
+      max-width: 600px;
+      line-height: 1.6;
+    }
+
+    /* ── FEATURES ── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto 40px;
+    }
+
+    .feature-card {
+      background: rgba(20, 20, 20, 0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid #1f1f1f;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: left;
+      transition: all 0.3s;
+    }
+
+    .feature-card:hover {
+      border-color: #4caf50;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px rgba(76, 175, 80, 0.15);
+    }
+
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .feature-card h3 {
+      font-size: 14px;
+      color: #fff;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .feature-card p {
+      font-size: 12px;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    /* ── CTA BUTTON ── */
+    .cta-btn {
+      background: linear-gradient(135deg, #4caf50 0%, #43a047 100%);
+      color: #000;
+      border: none;
+      padding: 16px 48px;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 0.5px;
+      box-shadow: 0 10px 30px rgba(76, 175, 80, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cta-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 40px rgba(76, 175, 80, 0.4);
+    }
+
+    .cta-btn:active {
+      transform: translateY(0);
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align: center;
+      padding: 20px 0;
+      color: #444;
+      font-size: 11px;
+      border-top: 1px solid #1a1a1a;
+      margin-top: 40px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 36px; }
+      .hero-icon { font-size: 48px; }
+      .features { grid-template-columns: 1fr; }
+      .cta-btn { padding: 14px 36px; font-size: 14px; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div class="logo">⬡ AGSKY</div>
+      <div class="lang-selector" id="lang-selector">
+        <button class="lang-btn active" data-lang="english">EN</button>
+        <button class="lang-btn" data-lang="tamil">தமிழ்</button>
+        <button class="lang-btn" data-lang="hindi">हिन्दी</button>
+        <button class="lang-btn" data-lang="telugu">తెలుగు</button>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-icon">🌾</div>
+      <h1 id="title">AGSKY</h1>
+      <p class="subtitle" id="subtitle">AI-Powered Farm Management</p>
+      <p class="tagline" id="tagline">
+        Satellite-based crop monitoring, weather forecasting, and market insights —
+        all in your own language.
+      </p>
+
+      <!-- FEATURES -->
+      <div class="features">
+        <div class="feature-card">
+          <div class="feature-icon">🛰️</div>
+          <h3 id="f1-title">Satellite Analysis</h3>
+          <p id="f1-desc">Real-time crop health monitoring using Sentinel satellites</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌦️</div>
+          <h3 id="f2-title">Weather Forecast</h3>
+          <p id="f2-desc">5-day weather predictions with irrigation advice</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💰</div>
+          <h3 id="f3-title">Market Prices</h3>
+          <p id="f3-desc">Live mandi prices and profit calculations</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🤖</div>
+          <h3 id="f4-title">AI Advisor</h3>
+          <p id="f4-desc">Personalized advice in your language, anytime</p>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <button class="cta-btn" onclick="startApp()">
+        <span id="cta-text">Start Farm Analysis</span>
+        <span>→</span>
+      </button>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      Powered by Google Earth Engine, Gemini AI, and OpenWeatherMap
+    </div>
+
+  </div>
+
+  <script>
+    // ── TRANSLATIONS ──
+    const translations = {
+      english: {
+        subtitle: "AI-Powered Farm Management",
+        tagline:  "Satellite-based crop monitoring, weather forecasting, and market insights — all in your own language.",
+        f1_title: "Satellite Analysis",
+        f1_desc:  "Real-time crop health monitoring using Sentinel satellites",
+        f2_title: "Weather Forecast",
+        f2_desc:  "5-day weather predictions with irrigation advice",
+        f3_title: "Market Prices",
+        f3_desc:  "Live mandi prices and profit calculations",
+        f4_title: "AI Advisor",
+        f4_desc:  "Personalized advice in your language, anytime",
+        cta_text: "Start Farm Analysis"
+      },
+      tamil: {
+        subtitle: "AI-யால் இயக்கப்படும் விவசாய மேலாண்மை",
+        tagline:  "உங்கள் சொந்த மொழியில் செயற்கைக்கோள் பயிர் கண்காணிப்பு, வானிலை முன்னறிவிப்பு மற்றும் சந்தை விலைகள்.",
+        f1_title: "செயற்கைக்கோள் பகுப்பாய்வு",
+        f1_desc:  "Sentinel செயற்கைக்கோள் பயன்படுத்தி நேரடி பயிர் ஆரோக்கியம்",
+        f2_title: "வானிலை முன்னறிவிப்பு",
+        f2_desc:  "5 நாள் வானிலை + நீர்ப்பாசன ஆலோசனை",
+        f3_title: "சந்தை விலைகள்",
+        f3_desc:  "நேரடி சந்தை விலை + லாபம் கணக்கீடு",
+        f4_title: "AI ஆலோசகர்",
+        f4_desc:  "உங்கள் மொழியில் தனிப்பயன் ஆலோசனை",
+        cta_text: "பண்ணை பகுப்பாய்வு தொடங்கு"
+      },
+      hindi: {
+        subtitle: "AI-संचालित कृषि प्रबंधन",
+        tagline:  "आपकी अपनी भाषा में सैटेलाइट फसल निगरानी, मौसम पूर्वानुमान और बाजार भाव।",
+        f1_title: "सैटेलाइट विश्लेषण",
+        f1_desc:  "Sentinel सैटेलाइट से वास्तविक समय फसल स्वास्थ्य",
+        f2_title: "मौसम पूर्वानुमान",
+        f2_desc:  "5 दिन का मौसम + सिंचाई सलाह",
+        f3_title: "बाजार भाव",
+        f3_desc:  "लाइव मंडी भाव + लाभ गणना",
+        f4_title: "AI सलाहकार",
+        f4_desc:  "आपकी भाषा में व्यक्तिगत सलाह",
+        cta_text: "फार्म विश्लेषण शुरू करें"
+      },
+      telugu: {
+        subtitle: "AI-ఆధారిత వ్యవసాయ నిర్వహణ",
+        tagline:  "మీ స్వంత భాషలో ఉపగ్రహ పంట పర్యవేక్షణ, వాతావరణ సూచన మరియు మార్కెట్ ధరలు.",
+        f1_title: "ఉపగ్రహ విశ్లేషణ",
+        f1_desc:  "Sentinel ఉపగ్రహాలతో నిజ-సమయ పంట ఆరోగ్యం",
+        f2_title: "వాతావరణ సూచన",
+        f2_desc:  "5 రోజుల వాతావరణం + నీటిపారుదల సలహా",
+        f3_title: "మార్కెట్ ధరలు",
+        f3_desc:  "లైవ్ మండి ధరలు + లాభ గణన",
+        f4_title: "AI సలహాదారు",
+        f4_desc:  "మీ భాషలో వ్యక్తిగత సలహా",
+        cta_text: "వ్యవసాయ విశ్లేషణ ప్రారంభించండి"
+      }
+    };
+
+    // ── LANGUAGE SWITCHER ──
+    let currentLang = localStorage.getItem('agsky_lang') || 'english';
+
+    function applyLanguage(lang) {
+      const t = translations[lang];
+      if (!t) return;
+
+      document.getElementById('subtitle').textContent = t.subtitle;
+      document.getElementById('tagline').textContent  = t.tagline;
+      document.getElementById('f1-title').textContent = t.f1_title;
+      document.getElementById('f1-desc').textContent  = t.f1_desc;
+      document.getElementById('f2-title').textContent = t.f2_title;
+      document.getElementById('f2-desc').textContent  = t.f2_desc;
+      document.getElementById('f3-title').textContent = t.f3_title;
+      document.getElementById('f3-desc').textContent  = t.f3_desc;
+      document.getElementById('f4-title').textContent = t.f4_title;
+      document.getElementById('f4-desc').textContent  = t.f4_desc;
+      document.getElementById('cta-text').textContent = t.cta_text;
+
+      // Update active button
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+      });
+
+      localStorage.setItem('agsky_lang', lang);
+      currentLang = lang;
+    }
+
+    // Init language on load
+    applyLanguage(currentLang);
+
+    // Button clicks
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
+    });
+
+    // ── START APP ──
+    async function startApp() {
+      const userData = localStorage.getItem('agsky_user');
+
+      if (!userData) {
+        // Not logged in → sign in / sign up page
+        window.location.href = '/auth';
+        return;
+      }
+
+      // Logged in → check cached dashboard
+      try {
+        const user = JSON.parse(userData);
+        const res = await fetch('/api/cached-dashboard/' + user._id);
+        const data = await res.json();
+
+        if (data.has_cache) {
+          // Has saved farm → go direct to dashboard
+          sessionStorage.setItem('agsky_lat',   data.lat);
+          sessionStorage.setItem('agsky_lon',   data.lon);
+          sessionStorage.setItem('agsky_acres', data.acres);
+          sessionStorage.setItem('agsky_session_id', data.session_id);
+          sessionStorage.setItem('agsky_use_cache', 'true');
+          window.location.href = '/dashboard';
+        } else {
+          // No saved farm yet → pick location
+          window.location.href = '/map';
+        }
+      } catch (e) {
+        // Error → default to map
+        window.location.href = '/map';
+      }
+    }
+  </script>
+
+</body>
+</html>

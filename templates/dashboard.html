@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AGSKY — Farm Dashboard</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+      --cream:       #f5f0e8;
+      --cream-dark:  #ebe4d4;
+      --forest:      #2d5016;
+      --forest-light:#3d6b1f;
+      --earth:       #d97706;
+      --earth-light: #f59e0b;
+      --text-dark:   #1f2937;
+      --text-muted:  #6b7280;
+      --border:      #d6cdb8;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans Tamil', sans-serif;
+      background: var(--cream);
+      color: var(--text-dark);
+      min-height: 100vh;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      background: var(--forest);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 500;
+    }
+    .topbar .left { display:flex; align-items:center; gap:14px; }
+    .topbar .logo {
+      font-family: 'Fraunces', serif;
+      font-size:20px; font-weight:900;
+      color: var(--cream); letter-spacing:1px; cursor:pointer;
+    }
+    .topbar .back {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: var(--cream);
+      padding: 7px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .lang-selector { display:flex; gap:6px; }
+    .lang-btn {
+      background:transparent; border:1px solid rgba(255,255,255,0.25);
+      color: rgba(245,240,232,0.8);
+      padding:5px 12px; border-radius:16px;
+      font-size:11px; font-weight:600; cursor:pointer;
+    }
+    .lang-btn.active { background: var(--cream); color: var(--forest); }
+
+    /* LAYOUT WITH SIDEBAR */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 56px);
+    }
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .sidebar.mobile-show { display: block; }
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: white;
+      border-right: 1px solid var(--border);
+      padding: 20px 0;
+    }
+    .sidebar-title {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 0 20px 12px;
+      font-weight: 700;
+    }
+    .sidebar-tab {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .sidebar-tab:hover {
+      background: var(--cream);
+      color: var(--forest);
+    }
+    .sidebar-tab.active {
+      background: var(--cream);
+      color: var(--forest);
+      border-left-color: var(--forest);
+    }
+    .sidebar-tab .icon { font-size: 18px; }
+
+    /* CONTENT */
+    .content {
+      padding: 20px 20px 40px;
+      overflow-y: auto;
+    }
+    @media (max-width: 768px) {
+      .content { padding: 16px; }
+    }
+
+    .tab-content { display: none; animation: fadeIn 0.3s; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Loading screen */
+    .loading-screen {
+      position:fixed; inset:0; background: var(--cream);
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; z-index:2000;
+    }
+    .loading-screen.hide { display:none; }
+    .loader-big {
+      width:64px; height:64px;
+      border:5px solid var(--cream-dark);
+      border-top-color: var(--forest);
+      border-radius:50%;
+      animation:spin 1s linear infinite;
+      margin-bottom:24px;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-screen .title {
+      font-family: 'Fraunces', serif;
+      font-size: 24px; font-weight: 900;
+      color: var(--forest); margin-bottom: 8px;
+    }
+
+    /* Summary */
+    .summary-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .summary-header {
+      font-family: 'Fraunces', serif;
+      font-size: 18px; font-weight: 700;
+      color: var(--forest); margin-bottom: 14px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .summary-item {
+      background: var(--cream);
+      border-radius: 10px;
+      padding: 12px; text-align: center;
+    }
+    .summary-item .label {
+      font-size: 10px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1px;
+      font-weight: 600; margin-bottom: 4px;
+    }
+    .summary-item .value {
+      font-family: 'Fraunces', serif;
+      font-size: 20px; font-weight: 700;
+      color: var(--forest);
+    }
+    .summary-item .sub {
+      font-size: 11px; color: var(--text-muted); margin-top: 3px;
+    }
+    .health-bar {
+      height: 5px; background: var(--cream-dark);
+      border-radius: 3px; overflow: hidden; margin-top: 6px;
+    }
+    .health-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #e53935 0%, #ffa726 50%, #4caf50 100%);
+    }
+    .status-pill {
+      display: inline-block; padding: 3px 10px;
+      border-radius: 100px; font-size: 10px; font-weight: 700;
+    }
+    .status-good     { background: #dcfce7; color: #166534; }
+    .status-moderate { background: #fef3c7; color: #92400e; }
+    .status-critical { background: #fee2e2; color: #991b1b; }
+
+    /* Split layout */
+    .split-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .split-layout { grid-template-columns: 1fr; }
+    }
+
+    .panel-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex; flex-direction: column;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 10px; flex-wrap: wrap;
+    }
+    .panel-title {
+      font-family: 'Fraunces', serif;
+      font-size: 17px; font-weight: 700;
+      color: var(--forest);
+    }
+
+    /* Map */
+    #dash-map, #pest-map {
+      width: 100%; height: 450px;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+    }
+
+    .map-toggle {
+      display: flex; background: var(--cream);
+      border-radius: 100px; padding: 3px;
+      border: 1px solid var(--border);
+    }
+    .map-toggle button {
+      padding: 5px 12px; background: transparent;
+      border: none; border-radius: 100px;
+      font-size: 11px; font-weight: 600;
+      color: var(--text-muted); cursor: pointer;
+      font-family: inherit;
+    }
+    .map-toggle button.active {
+      background: var(--forest); color: var(--cream);
+    }
+
+    /* Grid */
+    .grid-container {
+      flex: 1; display: flex;
+      align-items: center; justify-content: center;
+      padding: 14px; background: var(--cream);
+      border-radius: 10px; min-height: 450px;
+    }
+    .farm-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 4px; width: 100%; max-width: 380px;
+      aspect-ratio: 1; background: #000;
+      padding: 4px; border-radius: 8px;
+    }
+    .farm-cell {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer; position: relative;
+      transition: all 0.2s;
+      font-family: 'Fraunces', serif;
+      border-radius: 4px; overflow: hidden;
+    }
+    .farm-cell:hover {
+      transform: scale(1.03); z-index: 2;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    }
+    .farm-cell .label {
+      color: white; font-weight: 900; font-size: 18px;
+      text-shadow: 0 0 4px #000, 0 0 8px #000, 1px 1px 2px #000;
+      pointer-events: none;
+    }
+    .farm-cell .mini-metric {
+      color: rgba(255,255,255,0.95);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700; font-size: 11px; margin-top: 2px;
+      text-shadow: 0 0 3px #000, 0 0 5px #000;
+      pointer-events: none;
+    }
+    .farm-cell.center {
+      outline: 3px solid var(--earth);
+      outline-offset: -3px;
+    }
+
+    .tap-hint {
+      font-size: 11px; color: var(--earth);
+      font-weight: 600; background: #fef3c7;
+      padding: 5px 12px; border-radius: 100px;
+    }
+
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-top: 12px; padding: 10px;
+      background: var(--cream); border-radius: 8px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text-dark); font-weight: 500;
+    }
+    .legend-dot {
+      width: 12px; height: 12px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+
+    /* SIDE PANEL (cell chat) */
+    .side-panel-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1500;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .side-panel-backdrop.show {
+      opacity: 1; pointer-events: auto;
+    }
+    .side-panel {
+      position: fixed;
+      top: 0; right: 0; width: 400px; max-width: 100%;
+      height: 100vh; background: white;
+      z-index: 1600;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(.2,.9,.3,1);
+      display: flex; flex-direction: column;
+      box-shadow: -20px 0 60px rgba(0,0,0,0.2);
+    }
+    .side-panel.show { transform: translateX(0); }
+    .side-panel-header {
+      padding: 20px; background: var(--forest); color: var(--cream);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .side-panel-header .title {
+      font-family: 'Fraunces', serif;
+      font-size: 22px; font-weight: 700;
+    }
+    .side-panel-header .subtitle {
+      font-size: 11px; opacity: 0.85; margin-top: 2px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .side-panel-close {
+      background: rgba(255,255,255,0.2);
+      border: none; color: white;
+      width: 32px; height: 32px; border-radius: 50%;
+      font-size: 18px; cursor: pointer;
+    }
+
+    .cell-info {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      background: var(--cream);
+    }
+    .cell-size-line {
+      font-size: 12px; color: var(--text-muted);
+      margin-bottom: 10px; font-weight: 600;
+    }
+    .metrics-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .metric-box {
+      background: white; border-radius: 8px;
+      padding: 10px; text-align: center;
+      border: 1px solid var(--border);
+    }
+    .metric-box .label {
+      font-size: 9px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+    }
+    .metric-box .value {
+      font-family: 'Fraunces', serif;
+      font-size: 18px; font-weight: 700;
+      color: var(--forest); margin-top: 2px;
+    }
+
+    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-messages {
+      flex: 1; overflow-y: auto;
+      padding: 16px 20px; display: flex;
+      flex-direction: column; gap: 10px;
+    }
+    .cell-msg {
+      max-width: 85%; padding: 10px 14px;
+      border-radius: 14px; font-size: 13px;
+      line-height: 1.55; white-space: pre-wrap;
+    }
+    .cell-msg.cell {
+      background: var(--cream); color: var(--text-dark);
+      align-self: flex-start; border-bottom-left-radius: 4px;
+    }
+    .cell-msg.user {
+      background: var(--forest); color: var(--cream);
+      align-self: flex-end; border-bottom-right-radius: 4px;
+    }
+    .cell-msg.typing { color: var(--text-muted); font-style: italic; }
+
+    .suggestions {
+      padding: 0 20px 10px; display: flex;
+      gap: 6px; flex-wrap: wrap;
+    }
+    .suggestion-chip {
+      background: var(--cream); border: 1px solid var(--border);
+      color: var(--forest); padding: 5px 12px;
+      border-radius: 100px; font-size: 11px;
+      cursor: pointer; font-weight: 600; font-family: inherit;
+    }
+    .suggestion-chip:hover {
+      background: var(--forest); color: var(--cream);
+    }
+
+    .chat-input-area {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 8px; background: white;
+    }
+    .chat-input-area input {
+      flex: 1; background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 100px; padding: 10px 16px;
+      color: var(--text-dark); font-size: 13px;
+      outline: none; font-family: inherit;
+    }
+    .chat-input-area button {
+      background: var(--forest); color: var(--cream);
+      border: none; width: 40px; height: 40px;
+      border-radius: 50%; cursor: pointer; font-size: 16px;
+    }
+    .chat-input-area .mic-btn { background: var(--cream); color: var(--forest); }
+    .chat-input-area .mic-btn.recording { background: #e53935; color: white; }
+
+    /* ═══ PEST TAB STYLES ═══ */
+    .pest-tabs {
+      display: flex; background: var(--cream);
+      border-radius: 100px; padding: 4px;
+      margin-bottom: 20px; max-width: 500px;
+    }
+    .pest-tab {
+      flex: 1; padding: 10px 14px;
+      background: transparent; border: none;
+      border-radius: 100px; font-size: 13px;
+      font-weight: 700; color: var(--text-muted);
+      cursor: pointer; font-family: inherit;
+    }
+    .pest-tab.active {
+      background: var(--forest); color: var(--cream);
+    }
+
+    .pest-section { display: none; animation: fadeIn 0.3s; }
+    .pest-section.active { display: block; }
+
+    /* Camera scanner */
+    .scan-card {
+      background: white; border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px;
+    }
+    .scan-hero {
+      text-align: center; padding: 30px 20px;
+      background: linear-gradient(135deg, var(--forest) 0%, var(--forest-light) 100%);
+      border-radius: 12px; color: var(--cream); margin-bottom: 20px;
+    }
+    .scan-hero h2 {
+      font-family: 'Fraunces', serif;
+      font-size: 22px; font-weight: 700; margin-bottom: 8px;
+    }
+    .scan-hero p { font-size: 13px; opacity: 0.9; }
+    .scan-hero .icon { font-size: 48px; margin-bottom: 12px; }
+
+    .upload-buttons {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .upload-btn {
+      padding: 20px 16px;
+      background: var(--cream);
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14px; font-weight: 700;
+      color: var(--forest); cursor: pointer;
+      transition: all 0.2s;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+    }
+    .upload-btn:hover {
+      border-color: var(--forest);
+      background: var(--forest-bg);
+      transform: translateY(-2px);
+    }
+    .upload-btn .icon { font-size: 32px; }
+    .upload-btn .sub {
+      font-size: 11px; color: var(--text-muted);
+      font-weight: 500; margin-top: 4px;
+    }
+
+    /* Preview */
+    .image-preview {
+      text-align: center; margin-top: 20px; display: none;
+    }
+    .image-preview.show { display: block; }
+    .image-preview img {
+      max-width: 100%; max-height: 300px;
+      border-radius: 12px; border: 2px solid var(--border);
+      margin-bottom: 14px;
+    }
+
+    .btn-analyze {
+      width: 100%; padding: 14px;
+      background: var(--forest); color: var(--cream);
+      border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-analyze:hover { background: var(--forest-light); }
+    .btn-analyze:disabled {
+      background: var(--text-light); cursor: not-allowed;
+    }
+
+    /* Scanning state */
+    .scanning {
+      text-align: center; padding: 40px 20px; display: none;
+    }
+    .scanning.show { display: block; }
+    .scanning .loader-big { margin: 0 auto 16px; }
+    .scanning .text {
+      font-size: 14px; color: var(--text-muted);
+    }
+
+    /* Result card */
+    .result-card {
+      background: white; border: 2px solid var(--border);
+      border-radius: 16px; padding: 20px;
+      margin-top: 20px; display: none;
+    }
+    .result-card.show { display: block; animation: slideUp 0.3s; }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .disease-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 14px; padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .disease-icon {
+      font-size: 40px;
+    }
+    .disease-name {
+      flex: 1;
+    }
+    .disease-name h3 {
+      font-family: 'Fraunces', serif;
+      font-size: 20px; font-weight: 700;
+      color: var(--forest); margin-bottom: 4px;
+    }
+    .confidence-badge {
+      display: inline-block; padding: 3px 10px;
+      border-radius: 100px; font-size: 10px;
+      font-weight: 700; margin-right: 6px;
+    }
+    .conf-high { background: #dcfce7; color: #166534; }
+    .conf-moderate { background: #fef3c7; color: #92400e; }
+    .conf-low { background: #fee2e2; color: #991b1b; }
+
+    .severity-pill {
+      display: inline-block; padding: 3px 10px;
+      border-radius: 100px; font-size: 10px; font-weight: 700;
+    }
+    .sev-none { background: #dcfce7; color: #166534; }
+    .sev-mild { background: #fef3c7; color: #92400e; }
+    .sev-moderate { background: #fed7aa; color: #9a3412; }
+    .sev-severe { background: #fee2e2; color: #991b1b; }
+
+    .result-description {
+      font-size: 13px; line-height: 1.6;
+      color: var(--text-dark); margin-bottom: 16px;
+      padding: 12px; background: var(--cream);
+      border-radius: 8px;
+    }
+
+    .remedy-box {
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px;
+      margin-bottom: 12px;
+    }
+    .remedy-box.natural {
+      background: #f0fdf4; border-color: #86efac;
+    }
+    .remedy-box.chemical {
+      background: #fef3c7; border-color: #fbbf24;
+    }
+    .remedy-header {
+      font-family: 'Fraunces', serif;
+      font-size: 14px; font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .remedy-box.natural .remedy-header { color: #166534; }
+    .remedy-box.chemical .remedy-header { color: #92400e; }
+    .remedy-item {
+      font-size: 12px; line-height: 1.6;
+      margin-bottom: 4px;
+    }
+    .remedy-item strong { color: var(--forest); }
+
+    .btn-shops {
+      width: 100%; padding: 12px;
+      background: var(--earth); color: white;
+      border: none; border-radius: 10px;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer; margin-top: 10px;
+      text-decoration: none; display: block;
+      text-align: center; font-family: inherit;
+    }
+    .btn-shops:hover { background: var(--earth-light); }
+
+    .btn-scan-again {
+      width: 100%; padding: 10px;
+      background: transparent; color: var(--forest);
+      border: 1px solid var(--forest);
+      border-radius: 8px;
+      font-size: 12px; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+      font-family: inherit;
+    }
+    .btn-scan-again:hover {
+      background: var(--forest); color: white;
+    }
+
+    /* Pest prediction popup */
+    .pest-predict-panel {
+      position: fixed; top: 0; right: 0;
+      width: 400px; max-width: 100%; height: 100vh;
+      background: white; z-index: 1600;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(.2,.9,.3,1);
+      display: flex; flex-direction: column;
+      box-shadow: -20px 0 60px rgba(0,0,0,0.2);
+      overflow-y: auto;
+    }
+    .pest-predict-panel.show { transform: translateX(0); }
+
+    .risk-badge {
+      display: inline-block; padding: 6px 16px;
+      border-radius: 100px; font-size: 12px;
+      font-weight: 800; margin-bottom: 10px;
+    }
+    .risk-high { background: #fee2e2; color: #991b1b; }
+    .risk-moderate { background: #fef3c7; color: #92400e; }
+    .risk-low { background: #dcfce7; color: #166534; }
+  </style>
+</head>
+
+<body>
+
+  <!-- LOADING -->
+  <div class="loading-screen" id="loading-screen">
+    <div class="loader-big"></div>
+    <div class="title">🛰️ AGSKY</div>
+    <div class="step-text" id="loading-step">Fetching satellite data...</div>
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="left">
+      <div class="logo" onclick="window.location.href='/'">⬡ AGSKY</div>
+      <button class="back" onclick="smartBack()">← Back</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="background:rgba(255,255,255,0.1); color:#f5f0e8; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600;">
+        👤 <span id="user-name">User</span>
+      </div>
+      <button onclick="logoutUser()" style="background:rgba(229,57,53,0.2); border:1px solid rgba(229,57,53,0.4); color:#ffcdd2; padding:6px 14px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer;">
+        🚪 Logout
+      </button>
+      <div class="lang-selector">
+        <button class="lang-btn active" data-lang="english">EN</button>
+        <button class="lang-btn" data-lang="tanglish">Tanglish</button>
+        <button class="lang-btn" data-lang="tamil">தமிழ்</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYOUT -->
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-title" data-i18n="nav_title">DASHBOARD</div>
+      <div class="sidebar-tab active" data-tab="grid" onclick="switchTab('grid')">
+        <span class="icon">🌾</span>
+        <span data-i18n="tab_grid">Farm Grid</span>
+      </div>
+      <div class="sidebar-tab" data-tab="pest" onclick="switchTab('pest')">
+        <span class="icon">🐛</span>
+        <span data-i18n="tab_pest">Pest & Disease AI</span>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- ─── TAB 1: FARM GRID ─── -->
+      <div class="tab-content active" id="tab-grid">
+
+        <!-- Summary -->
+        <div class="summary-card">
+          <div class="summary-header">🌾 <span id="summary-title">Your Farm</span></div>
+          <div class="summary-grid" id="summary-grid"></div>
+        </div>
+
+        <!-- Split: Map + Grid -->
+        <div class="split-layout">
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">🗺️ <span id="map-title">Farm Location</span></div>
+              <div class="map-toggle">
+                <button class="active" id="btn-satellite" onclick="switchMapView('satellite')">🛰️ <span id="btn-sat-text">Satellite</span></button>
+                <button id="btn-roadmap" onclick="switchMapView('roadmap')">🗺️ <span id="btn-road-text">Map</span></button>
+              </div>
+            </div>
+            <div id="dash-map"></div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">🌾 <span id="grid-title">Your Farm Grid</span></div>
+              <div class="tap-hint" id="tap-hint">👆 Tap any cell</div>
+            </div>
+            <div class="grid-container">
+              <div class="farm-grid" id="farm-grid"></div>
+            </div>
+            <div class="legend" id="legend"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ─── TAB 2: PEST AI ─── -->
+      <div class="tab-content" id="tab-pest">
+
+        <div class="summary-card">
+          <div class="summary-header">🐛 <span data-i18n="pest_ai_title">Pest & Disease AI</span></div>
+          <div style="font-size:13px; color:var(--text-muted); line-height:1.5;" data-i18n="pest_ai_subtitle">
+            AI-powered pest detection using camera or grid analysis
+          </div>
+        </div>
+
+        <!-- Pest sub-tabs -->
+        <div class="pest-tabs">
+          <button class="pest-tab active" data-pest-tab="camera" onclick="switchPestTab('camera')">
+            📷 <span data-i18n="pest_tab_camera">Camera Scanner</span>
+          </button>
+          <button class="pest-tab" data-pest-tab="grid" onclick="switchPestTab('grid')">
+            🗺️ <span data-i18n="pest_tab_grid">Grid Prediction</span>
+          </button>
+        </div>
+
+        <!-- Sub-tab: Camera Scanner -->
+        <div class="pest-section active" id="pest-camera">
+          <div class="scan-card">
+            <div class="scan-hero">
+              <div class="icon">📸</div>
+              <h2 data-i18n="scan_title">Scan Your Crop Leaf</h2>
+              <p data-i18n="scan_subtitle">Take a clear photo of affected leaf to detect disease</p>
+            </div>
+
+            <div class="upload-buttons" id="upload-buttons">
+              <button class="upload-btn" type="button" onclick="triggerCamera()">
+                <span class="icon">📷</span>
+                <span data-i18n="btn_take_photo">Take Photo</span>
+                <span class="sub" data-i18n="camera_hint">Use camera</span>
+              </button>
+              <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleImage(event)"/>
+
+              <button class="upload-btn" type="button" onclick="triggerGallery()">
+                <span class="icon">🖼️</span>
+                <span data-i18n="btn_upload">Upload Image</span>
+                <span class="sub" data-i18n="gallery_hint">From gallery</span>
+              </button>
+              <input type="file" id="gallery-input" accept="image/*" style="display:none;" onchange="handleImage(event)"/>
+            </div>
+
+            <!-- Preview -->
+            <div class="image-preview" id="image-preview">
+              <img id="preview-img" src="" alt="Preview"/>
+              <button class="btn-analyze" onclick="analyzeImage()">
+                🔍 <span data-i18n="btn_analyze">Analyze with AI</span>
+              </button>
+            </div>
+
+            <!-- Scanning -->
+            <div class="scanning" id="scanning">
+              <div class="loader-big"></div>
+              <div class="text" data-i18n="scanning_text">AI analyzing your leaf... (10-20 seconds)</div>
+            </div>
+
+            <!-- Result -->
+            <div class="result-card" id="scan-result"></div>
+          </div>
+        </div>
+
+        <!-- Sub-tab: Grid Pest Prediction -->
+        <div class="pest-section" id="pest-grid">
+          <div class="scan-card">
+            <div class="scan-hero" style="background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);">
+              <div class="icon">🗺️</div>
+              <h2 data-i18n="predict_title">Grid-Based Pest Prediction</h2>
+              <p data-i18n="predict_subtitle">Click any cell to predict pest risks based on crop + satellite data</p>
+            </div>
+
+            <div class="grid-container" style="margin-top:20px;">
+              <div class="farm-grid" id="pest-farm-grid"></div>
+            </div>
+
+            <div style="font-size:12px; color:var(--text-muted); text-align:center; margin-top:14px;" data-i18n="predict_hint">
+              💡 Click any cell to see pest predictions for that area
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SIDE PANEL: Cell Chat -->
+  <div class="side-panel-backdrop" id="side-backdrop" onclick="closeSidePanel()"></div>
+  <div class="side-panel" id="side-panel">
+    <div class="side-panel-header">
+      <div>
+        <div class="title" id="side-title">— Cell</div>
+        <div class="subtitle" id="side-subtitle">—</div>
+      </div>
+      <button class="side-panel-close" onclick="closeSidePanel()">×</button>
+    </div>
+
+    <div class="cell-info">
+      <div class="cell-size-line" id="cell-size-info">📐 —</div>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <div class="label">NDVI</div>
+          <div class="value" id="ndvi-val">—</div>
+        </div>
+        <div class="metric-box">
+          <div class="label">NDWI</div>
+          <div class="value" id="ndwi-val">—</div>
+        </div>
+        <div class="metric-box">
+          <div class="label">EVI</div>
+          <div class="value" id="evi-val">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-area">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="suggestions" id="chat-suggestions"></div>
+      <div class="chat-input-area">
+        <button class="mic-btn" id="mic-btn" onclick="toggleMic()">🎤</button>
+        <input type="text" id="chat-input" placeholder="Ask this cell..." onkeydown="if(event.key==='Enter')sendMessage()"/>
+        <button onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDE PANEL: Pest Prediction -->
+  <div class="side-panel-backdrop" id="pest-backdrop" onclick="closePestPanel()"></div>
+  <div class="pest-predict-panel" id="pest-predict-panel">
+    <div class="side-panel-header" style="background: var(--earth);">
+      <div>
+        <div class="title" id="pest-panel-title">— Cell</div>
+        <div class="subtitle" id="pest-panel-subtitle">PEST PREDICTION</div>
+      </div>
+      <button class="side-panel-close" onclick="closePestPanel()">×</button>
+    </div>
+    <div style="padding: 20px;" id="pest-panel-content">
+      <div class="scanning show">
+        <div class="loader-big"></div>
+        <div class="text" data-i18n="predict_loading">Analyzing pest risk...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script>
+    // AUTH CHECK
+    const userData = localStorage.getItem('agsky_user');
+    if (!userData) window.location.href = '/auth';
+    const user = JSON.parse(userData || '{}');
+    if (user && user.name) document.getElementById('user-name').textContent = user.name.split(' ')[0];
+
+    function logoutUser() {
+      if (confirm('Logout?')) {
+        localStorage.removeItem('agsky_user');
+        sessionStorage.clear();
+        window.location.href = '/auth';
+      }
+    }
+
+    function smartBack() {
+      const useCache = sessionStorage.getItem('agsky_use_cache') === 'true';
+      if (useCache) {
+        if (confirm('Go back to login?')) {
+          localStorage.removeItem('agsky_user');
+          sessionStorage.clear();
+          window.location.href = '/auth';
+        }
+      } else {
+        window.location.href = '/map';
+      }
+    }
+
+    // TRANSLATIONS
+    const translations = {
+      english: {
+        nav_title: "DASHBOARD", tab_grid: "Farm Grid", tab_pest: "Pest & Disease AI",
+        summary_title: "Your Farm", map_title: "Farm Location", grid_title: "Your Farm Grid",
+        tap_hint: "👆 Tap any cell", btn_satellite: "Satellite", btn_roadmap: "Map",
+        health_label: "Health", status_label: "Status", area_label: "Area", priority_label: "Priority",
+        loading_steps: ["Fetching satellite data...", "Removing clouds...", "Calculating NDVI...", "Detecting stress...", "Almost ready..."],
+        suggestions: ["How are you feeling?", "What do you need?", "Any problems?", "What should I do?"],
+        legend: { healthy: "Healthy Crop", water_stress: "Water Stress", nutrient_stress: "Needs Nutrients",
+                 waterlogging: "Waterlogging", pest_disease: "Pest/Disease", low_vegetation: "Low Crop", unknown: "Unknown" },
+        pest_ai_title: "Pest & Disease AI",
+        pest_ai_subtitle: "AI-powered pest detection using camera or grid analysis",
+        pest_tab_camera: "Camera Scanner", pest_tab_grid: "Grid Prediction",
+        scan_title: "Scan Your Crop Leaf",
+        scan_subtitle: "Take a clear photo of affected leaf to detect disease",
+        btn_take_photo: "Take Photo", btn_upload: "Upload Image",
+        camera_hint: "Use camera", gallery_hint: "From gallery",
+        btn_analyze: "Analyze with AI",
+        scanning_text: "AI analyzing your leaf... (10-20 seconds)",
+        predict_title: "Grid-Based Pest Prediction",
+        predict_subtitle: "Click any cell to predict pest risks based on crop + satellite data",
+        predict_hint: "💡 Click any cell to see pest predictions for that area",
+        predict_loading: "Analyzing pest risk...",
+        result_disease: "Disease Detected", result_healthy: "Healthy Plant",
+        result_natural: "🌿 Natural Remedy", result_chemical: "💊 Chemical Remedy",
+        result_prevention: "🛡️ Prevention Tips", result_find_shops: "🛒 Find Shops Nearby",
+        result_scan_again: "🔄 Scan Another Leaf",
+        result_symptoms: "Symptoms", result_ingredients: "Ingredients",
+        result_application: "Application", result_frequency: "Frequency",
+        result_dosage: "Dosage", result_price: "Price Range", result_caution: "⚠️ Caution",
+        risk_high: "HIGH RISK", risk_moderate: "MODERATE RISK", risk_low: "LOW RISK",
+        primary_threat: "Primary Threat", reasons: "Why?", action: "Immediate Action",
+        monitoring: "What to Monitor"
+      },
+      tanglish: {
+        nav_title: "DASHBOARD", tab_grid: "Farm Grid", tab_pest: "Pest & Disease AI",
+        summary_title: "Unga Farm", map_title: "Farm Location", grid_title: "Unga Farm Grid",
+        tap_hint: "👆 Edhu cell-um click pannunga", btn_satellite: "Satellite", btn_roadmap: "Map",
+        health_label: "Aarokiyam", status_label: "Nilai", area_label: "Parappu", priority_label: "Kavanam",
+        loading_steps: ["Satellite data edukurom...", "Clouds remove panrom...", "NDVI calculate panrom...", "Stress detect panrom...", "Ready aagudhu..."],
+        suggestions: ["Eppadi iruka?", "Enna thevai?", "Edhavadhu problem?", "Naan enna panna?"],
+        legend: { healthy: "Nalla Payir", water_stress: "Thanni Thevai", nutrient_stress: "Sathu Kurai",
+                 waterlogging: "Adhiga Neer", pest_disease: "Poochi/Noy", low_vegetation: "Kurai Payir", unknown: "Theriyala" },
+        pest_ai_title: "Poochi & Noy AI",
+        pest_ai_subtitle: "Camera ila grid use panni poochi kandupidikum AI",
+        pest_tab_camera: "Camera Scanner", pest_tab_grid: "Grid Prediction",
+        scan_title: "Unga Payir Ilai Scan Pannunga",
+        scan_subtitle: "Payir ilai oda clear photo eduthu noy kandupidikalam",
+        btn_take_photo: "Photo Edu", btn_upload: "Upload Pannu",
+        camera_hint: "Camera use pannu", gallery_hint: "Gallery la irunthu",
+        btn_analyze: "AI kitta Analyze Pannu",
+        scanning_text: "AI unga ilai analyze panrom... (10-20 seconds)",
+        predict_title: "Grid-Based Poochi Kanippu",
+        predict_subtitle: "Edhu cell-ah click pannunga, crop + satellite data vachi poochi risk sollaraen",
+        predict_hint: "💡 Edhu cell-ah click panna, antha area-ku poochi prediction varum",
+        predict_loading: "Poochi risk analyze panrom...",
+        result_disease: "Noy Kandupidichi", result_healthy: "Nalla Payir",
+        result_natural: "🌿 Iyarkai Marundhu", result_chemical: "💊 Rasayana Marundhu",
+        result_prevention: "🛡️ Thadupu Tips", result_find_shops: "🛒 Arugile Kadai Thedu",
+        result_scan_again: "🔄 Innoru Ilai Scan Pannu",
+        result_symptoms: "Arikuri", result_ingredients: "Porulgal",
+        result_application: "Enna Mathri Podunga", result_frequency: "Ethanai Murai",
+        result_dosage: "Alavu", result_price: "Vilai", result_caution: "⚠️ Jaakirathai",
+        risk_high: "ROMBA ABATHU", risk_moderate: "KONJAM ABATHU", risk_low: "PATTHIRAMA",
+        primary_threat: "Mukkiya Apathu", reasons: "Enna Karanam?", action: "Ippothaiye Pannu",
+        monitoring: "Enna Paakanum"
+      },
+      tamil: {
+        nav_title: "டாஷ்போர்டு", tab_grid: "பண்ணை கிரிட்", tab_pest: "பூச்சி மற்றும் நோய் AI",
+        summary_title: "உங்கள் பண்ணை", map_title: "பண்ணை இடம்", grid_title: "உங்கள் பண்ணை கிரிட்",
+        tap_hint: "👆 எந்த கட்டத்தையும் தொடுங்கள்", btn_satellite: "செயற்கைக்கோள்", btn_roadmap: "வரைபடம்",
+        health_label: "ஆரோக்கியம்", status_label: "நிலை", area_label: "பரப்பு", priority_label: "கவனம்",
+        loading_steps: ["செயற்கைக்கோள் தரவு எடுக்கிறோம்...", "மேகங்களை நீக்குகிறோம்...", "NDVI கணக்கிடுகிறோம்...", "அழுத்தம் கண்டறிகிறோம்...", "கிட்டத்தட்ட முடிந்தது..."],
+        suggestions: ["எப்படி இருக்கிறாய்?", "என்ன தேவை?", "ஏதாவது பிரச்சனை?", "நான் என்ன செய்யலாம்?"],
+        legend: { healthy: "நல்ல பயிர்", water_stress: "தண்ணீர் தேவை", nutrient_stress: "சத்து குறை",
+                 waterlogging: "அதிக நீர்", pest_disease: "பூச்சி/நோய்", low_vegetation: "குறை பயிர்", unknown: "தெரியல" },
+        pest_ai_title: "பூச்சி மற்றும் நோய் AI",
+        pest_ai_subtitle: "கேமரா அல்லது கிரிட் பயன்படுத்தி பூச்சி கண்டறியும் AI",
+        pest_tab_camera: "கேமரா ஸ்கேனர்", pest_tab_grid: "கிரிட் கணிப்பு",
+        scan_title: "உங்கள் பயிர் இலையை ஸ்கேன் செய்யுங்கள்",
+        scan_subtitle: "பாதிக்கப்பட்ட இலையின் தெளிவான புகைப்படம் எடுங்கள்",
+        btn_take_photo: "புகைப்படம் எடு", btn_upload: "பதிவேற்று",
+        camera_hint: "கேமரா பயன்படுத்து", gallery_hint: "கேலரியில் இருந்து",
+        btn_analyze: "AI மூலம் பகுப்பாய்வு",
+        scanning_text: "AI உங்கள் இலையை பகுப்பாய்வு செய்கிறது... (10-20 வினாடிகள்)",
+        predict_title: "கிரிட் அடிப்படையிலான பூச்சி கணிப்பு",
+        predict_subtitle: "எந்த கட்டத்தையும் தொடுங்கள் — பயிர் + செயற்கைக்கோள் தரவு மூலம் பூச்சி அபாயம் கணிக்கப்படும்",
+        predict_hint: "💡 கட்டத்தை தொடுங்கள் — அந்த பகுதிக்கான பூச்சி கணிப்பு காணப்படும்",
+        predict_loading: "பூச்சி அபாயம் பகுப்பாய்வு செய்யப்படுகிறது...",
+        result_disease: "நோய் கண்டறியப்பட்டது", result_healthy: "ஆரோக்கியமான பயிர்",
+        result_natural: "🌿 இயற்கை மருந்து", result_chemical: "💊 இரசாயன மருந்து",
+        result_prevention: "🛡️ தடுப்பு குறிப்புகள்", result_find_shops: "🛒 அருகில் கடை தேடு",
+        result_scan_again: "🔄 மீண்டும் ஸ்கேன்",
+        result_symptoms: "அறிகுறிகள்", result_ingredients: "பொருட்கள்",
+        result_application: "பயன்படுத்தும் முறை", result_frequency: "அடிக்கடி",
+        result_dosage: "அளவு", result_price: "விலை", result_caution: "⚠️ எச்சரிக்கை",
+        risk_high: "அதிக அபாயம்", risk_moderate: "நடுத்தர அபாயம்", risk_low: "குறைந்த அபாயம்",
+        primary_threat: "முக்கிய அச்சுறுத்தல்", reasons: "ஏன்?", action: "உடனடி நடவடிக்கை",
+        monitoring: "கண்காணிக்க வேண்டியவை"
+      }
+    };
+
+    let currentLang = localStorage.getItem('agsky_lang') || 'english';
+
+    function applyLanguage(lang) {
+      const t = translations[lang];
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) el.textContent = t[key];
+      });
+      document.getElementById('summary-title').textContent = t.summary_title;
+      document.getElementById('map-title').textContent = t.map_title;
+      document.getElementById('grid-title').textContent = t.grid_title;
+      document.getElementById('tap-hint').textContent = t.tap_hint;
+      document.getElementById('btn-sat-text').textContent = t.btn_satellite;
+      document.getElementById('btn-road-text').textContent = t.btn_roadmap;
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+      });
+      localStorage.setItem('agsky_lang', lang);
+      currentLang = lang;
+      if (window.dashData) {
+        renderSummary(window.dashData);
+        renderLegend(window.dashData);
+      }
+    }
+    applyLanguage(currentLang);
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
+    });
+
+    // Sidebar tab switcher
+    function switchTab(tab) {
+      document.querySelectorAll('.sidebar-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === tab);
+      });
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.toggle('active', el.id === 'tab-' + tab);
+      });
+      // If pest tab opened and grid exists, render pest grid
+      if (tab === 'pest' && window.dashData) {
+        renderPestGrid(window.dashData);
+      }
+    }
+
+    function switchPestTab(tab) {
+      document.querySelectorAll('.pest-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.pestTab === tab);
+      });
+      document.querySelectorAll('.pest-section').forEach(el => {
+        el.classList.toggle('active', el.id === 'pest-' + tab);
+      });
+    }
+
+    // PARAMS
+    const lat   = parseFloat(sessionStorage.getItem('agsky_lat'));
+    const lon   = parseFloat(sessionStorage.getItem('agsky_lon'));
+    const acres = parseFloat(sessionStorage.getItem('agsky_acres'));
+    if (!lat || !lon || !acres) {
+      alert('No farm data');
+      window.location.href = '/map';
+    }
+
+    const totalSideM = Math.sqrt(acres * 4046.856);
+    const cellSideM = Math.round(totalSideM / 3);
+
+    const stressColors = {
+      'healthy':'#4caf50','water_stress':'#e53935','nutrient_stress':'#ffa726',
+      'waterlogging':'#2196f3','pest_disease':'#9c27b0','low_vegetation':'#795548','unknown':'#9e9e9e'
+    };
+
+    // MAP
+    const map = L.map('dash-map', { center:[lat,lon], zoom:16, minZoom:10, maxZoom:18 });
+    const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'© Esri', maxZoom:18 });
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OSM', maxZoom:18 });
+    satLayer.addTo(map);
+    let mapMode = 'satellite';
+
+    function switchMapView(view) {
+      if (view === mapMode) return;
+      if (view === 'satellite') { map.removeLayer(osmLayer); satLayer.addTo(map); }
+      else { map.removeLayer(satLayer); osmLayer.addTo(map); }
+      document.getElementById('btn-satellite').classList.toggle('active', view === 'satellite');
+      document.getElementById('btn-roadmap').classList.toggle('active', view === 'roadmap');
+      mapMode = view;
+    }
+
+    L.marker([lat,lon], {
+      icon: L.divIcon({ className:'', html:`<div style="width:18px;height:18px;background:#d97706;border:3px solid white;border-radius:50%;box-shadow:0 0 0 4px rgba(217,119,6,0.3);"></div>`, iconSize:[18,18], iconAnchor:[9,9] })
+    }).addTo(map);
+
+    const bounds = L.latLngBounds(
+      [lat-(totalSideM/2)*(1/111320), lon-(totalSideM/2)*(1/(111320*Math.cos(lat*Math.PI/180)))],
+      [lat+(totalSideM/2)*(1/111320), lon+(totalSideM/2)*(1/(111320*Math.cos(lat*Math.PI/180)))]
+    );
+    L.rectangle(bounds, { color:'#d97706', weight:3, fillOpacity:0, dashArray:'6,6' }).addTo(map);
+
+    L.Control.geocoder({ defaultMarkGeocode:false, placeholder:'Search or paste lat,long...' })
+      .on('markgeocode', e => map.setView(e.geocode.center, 16)).addTo(map);
+
+    setTimeout(() => map.fitBounds(bounds, { padding:[40,40], maxZoom:18 }), 300);
+
+    // LOADING
+    const loadingSteps = translations[currentLang].loading_steps;
+    let stepIdx = 0;
+    const stepInterval = setInterval(() => {
+      if (stepIdx < loadingSteps.length) document.getElementById('loading-step').textContent = loadingSteps[stepIdx++];
+    }, 12000);
+
+    // SMART LOAD
+    const useCache = sessionStorage.getItem('agsky_use_cache') === 'true';
+
+    async function loadDashboard(forceFresh = false) {
+      try {
+        if (useCache && !forceFresh && user._id) {
+          document.getElementById('loading-step').textContent = 'Loading your saved farm...';
+          const res = await fetch('/api/cached-dashboard/' + user._id);
+          const data = await res.json();
+          if (data.has_cache) {
+            clearInterval(stepInterval);
+            window.dashData = data;
+            renderDashboard(data);
+            showCacheBanner(data.last_analyzed);
+            document.getElementById('loading-screen').classList.add('hide');
+            return;
+          }
+        }
+
+        const res = await fetch('/api/analyze', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ lat, lon, acres, language: currentLang, user_id: user._id })
+        });
+        const data = await res.json();
+        clearInterval(stepInterval);
+        if (data.error) { alert(data.error); return; }
+        sessionStorage.setItem('agsky_use_cache', 'true');
+        sessionStorage.setItem('agsky_session_id', data.session_id);
+        window.dashData = data;
+        renderDashboard(data);
+        document.getElementById('loading-screen').classList.add('hide');
+      } catch (err) {
+        clearInterval(stepInterval);
+        alert('Failed: ' + err.message);
+        document.getElementById('loading-screen').classList.add('hide');
+      }
+    }
+
+    function showCacheBanner(lastAnalyzed) {
+      let banner = document.getElementById('cache-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'cache-banner';
+        banner.style.cssText = 'background:#fef3c7; border:1px solid #f59e0b; color:#92400e; padding:10px 14px; border-radius:10px; margin-bottom:14px; font-size:12px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;';
+        const content = document.querySelector('#tab-grid');
+        content.insertBefore(banner, content.firstChild);
+      }
+      banner.innerHTML = `
+        <div>📅 <strong>Cached data</strong> • Last analyzed: ${lastAnalyzed}</div>
+        <button onclick="refreshAnalysis()" style="background:#d97706; color:white; border:none; padding:6px 14px; border-radius:100px; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">
+          🔄 Refresh
+        </button>
+      `;
+    }
+
+    window.refreshAnalysis = function() {
+      if (!confirm('Re-analyze satellite data? Takes 30-60 seconds.')) return;
+      sessionStorage.setItem('agsky_use_cache', 'false');
+      window.location.reload();
+    };
+
+    loadDashboard(false);
+
+    // RENDER
+    function renderDashboard(data) {
+      renderSummary(data);
+      renderGrid(data);
+      renderLegend(data);
+    }
+
+    function renderSummary(data) {
+      const t = translations[currentLang];
+      const statusClass = { GOOD:'status-good', MODERATE:'status-moderate', CRITICAL:'status-critical' }[data.farm_status.status] || 'status-moderate';
+      document.getElementById('summary-grid').innerHTML = `
+        <div class="summary-item">
+          <div class="label">${t.health_label}</div>
+          <div class="value">${data.health_score}<span style="font-size:12px;color:var(--text-muted);">/100</span></div>
+          <div class="health-bar"><div class="health-bar-fill" style="width:${data.health_score}%"></div></div>
+        </div>
+        <div class="summary-item">
+          <div class="label">${t.status_label}</div>
+          <div class="value" style="font-size:14px;"><span class="status-pill ${statusClass}">${data.farm_status.status}</span></div>
+        </div>
+        <div class="summary-item">
+          <div class="label">${t.area_label}</div>
+          <div class="value">${data.acres}<span style="font-size:12px;color:var(--text-muted);"> ac</span></div>
+          <div class="sub">${totalSideM.toFixed(0)}m × ${totalSideM.toFixed(0)}m</div>
+        </div>
+        <div class="summary-item">
+          <div class="label">${t.priority_label}</div>
+          <div class="value" style="font-size:16px;">${data.priority_cell.label}</div>
+          <div class="sub">${data.priority_cell.stress.replace(/_/g,' ')}</div>
+        </div>
+      `;
+    }
+
+    function renderGrid(data, elementId = 'farm-grid', clickHandler = null) {
+      const layout = [['NW','N','NE'],['W','CENTER','E'],['SW','S','SE']];
+      const gridEl = document.getElementById(elementId);
+      gridEl.innerHTML = '';
+      for (const row of layout) {
+        for (const label of row) {
+          const cell = data.grid[label];
+          const stress = data.cell_stress[label] || { stress_type: 'unknown' };
+          const stressType = stress.stress_type || 'unknown';
+          const fillColor = stressColors[stressType] || stressColors.unknown;
+          const div = document.createElement('div');
+          div.className = 'farm-cell' + (label === 'CENTER' ? ' center' : '');
+          div.style.background = fillColor;
+          div.innerHTML = `<div class="label">${label}</div><div class="mini-metric">${cell?.ndvi ?? '—'}</div>`;
+          div.onclick = clickHandler
+            ? () => clickHandler(label, cell, stress)
+            : () => openSidePanel(label, cell, stress);
+          gridEl.appendChild(div);
+        }
+      }
+    }
+
+    function renderPestGrid(data) {
+      renderGrid(data, 'pest-farm-grid', openPestPanel);
+    }
+
+    function renderLegend(data) {
+      const t = translations[currentLang];
+      const types = new Set();
+      for (const label in data.cell_stress) types.add(data.cell_stress[label].stress_type || 'unknown');
+      document.getElementById('legend').innerHTML = Array.from(types).map(type => `
+        <div class="legend-item"><span class="legend-dot" style="background:${stressColors[type] || stressColors.unknown}"></span><span>${t.legend[type] || type.replace(/_/g,' ')}</span></div>
+      `).join('');
+    }
+
+    // CELL CHAT
+    let currentCellLabel = null, currentCellData = null, chatHistory = [];
+
+    function openSidePanel(label, cellData, stress) {
+      currentCellLabel = label;
+      currentCellData = { cell: cellData, stress };
+      chatHistory = [];
+      const t = translations[currentLang];
+      document.getElementById('side-title').textContent = label + ' Cell';
+      document.getElementById('side-subtitle').textContent = stress.stress_type ? stress.stress_type.replace(/_/g,' ').toUpperCase() : 'UNKNOWN';
+      document.getElementById('cell-size-info').textContent = `📐 ${cellSideM}m × ${cellSideM}m • ~${(acres/9).toFixed(2)} acres`;
+      document.getElementById('ndvi-val').textContent = cellData?.ndvi ?? '—';
+      document.getElementById('ndwi-val').textContent = cellData?.ndwi ?? '—';
+      document.getElementById('evi-val').textContent = cellData?.evi ?? '—';
+      document.getElementById('chat-messages').innerHTML = '';
+      document.getElementById('chat-suggestions').style.display = 'flex';
+      document.getElementById('chat-suggestions').innerHTML = t.suggestions.map(s => `<button class="suggestion-chip" onclick="sendSuggestion('${s.replace(/'/g,"\\'")}')">${s}</button>`).join('');
+      document.getElementById('side-backdrop').classList.add('show');
+      document.getElementById('side-panel').classList.add('show');
+      getCellIntro();
+    }
+
+    function closeSidePanel() {
+      document.getElementById('side-backdrop').classList.remove('show');
+      document.getElementById('side-panel').classList.remove('show');
+    }
+
+    async function getCellIntro() {
+      const typingId = addCellMessage('...', 'cell', true);
+      try {
+        const res = await fetch('/api/cell-chat', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ cell_label: currentCellLabel, cell_data: currentCellData, question:'__intro__', history:[], language: currentLang })
+        });
+        const data = await res.json();
+        removeMessage(typingId);
+        addCellMessage(data.answer || 'Hello!', 'cell');
+        chatHistory.push({ role:'assistant', content: data.answer });
+      } catch(err) { removeMessage(typingId); addCellMessage('Unable to respond.', 'cell'); }
+    }
+
+    function sendSuggestion(text) {
+      document.getElementById('chat-input').value = text;
+      sendMessage();
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+      addCellMessage(text, 'user');
+      chatHistory.push({ role:'user', content: text });
+      input.value = '';
+      document.getElementById('chat-suggestions').style.display = 'none';
+      const typingId = addCellMessage('...', 'cell', true);
+      try {
+        const res = await fetch('/api/cell-chat', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ cell_label: currentCellLabel, cell_data: currentCellData, question: text, history: chatHistory.slice(-6), language: currentLang })
+        });
+        const data = await res.json();
+        removeMessage(typingId);
+        addCellMessage(data.answer || 'Unable to respond.', 'cell');
+        chatHistory.push({ role:'assistant', content: data.answer });
+        // Voice playback
+        if (data.answer) speakText(data.answer);
+      } catch(err) { removeMessage(typingId); addCellMessage('Network error.', 'cell'); }
+    }
+
+    let msgCounter = 0;
+    function addCellMessage(text, type, isTyping=false) {
+      const container = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = 'cell-msg ' + type + (isTyping ? ' typing' : '');
+      div.id = 'msg-' + (++msgCounter);
+      div.textContent = text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return div.id;
+    }
+    function removeMessage(id) { const el = document.getElementById(id); if (el) el.remove(); }
+
+    // Voice
+    let recognition = null;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+      recognition = new SR();
+      recognition.continuous = false; recognition.interimResults = false;
+    }
+    const langMap = { english:'en-IN', tanglish:'en-IN', tamil:'ta-IN' };
+
+    function toggleMic() {
+      if (!recognition) return;
+      const btn = document.getElementById('mic-btn');
+      if (btn.classList.contains('recording')) { recognition.stop(); return; }
+      recognition.lang = langMap[currentLang] || 'en-IN';
+      btn.classList.add('recording');
+      recognition.onresult = e => { document.getElementById('chat-input').value = e.results[0][0].transcript; btn.classList.remove('recording'); sendMessage(); };
+      recognition.onerror = recognition.onend = () => btn.classList.remove('recording');
+      recognition.start();
+    }
+
+    // ═══════════════════════════════════════════════════
+    // PEST DETECTION (Phase 2)
+    // ═══════════════════════════════════════════════════
+
+    let currentImageBase64 = null;
+
+    function triggerCamera() {
+      // Remove + recreate input to ensure fresh capture="environment" attribute
+      const oldInput = document.getElementById('camera-input');
+      const newInput = document.createElement('input');
+      newInput.type = 'file';
+      newInput.id = 'camera-input';
+      newInput.accept = 'image/*';
+      newInput.setAttribute('capture', 'environment');
+      newInput.style.display = 'none';
+      newInput.onchange = handleImage;
+      oldInput.parentNode.replaceChild(newInput, oldInput);
+      newInput.click();
+    }
+
+    function triggerGallery() {
+      const input = document.getElementById('gallery-input');
+      input.value = '';  // reset
+      input.click();
+    }
+
+    function handleImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        currentImageBase64 = e.target.result;
+        document.getElementById('preview-img').src = currentImageBase64;
+        document.getElementById('image-preview').classList.add('show');
+        document.getElementById('upload-buttons').style.display = 'none';
+        document.getElementById('scan-result').classList.remove('show');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function analyzeImage() {
+      if (!currentImageBase64) return;
+      document.getElementById('image-preview').classList.remove('show');
+      document.getElementById('scanning').classList.add('show');
+
+      try {
+        const res = await fetch('/api/scan-disease', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            image_base64: currentImageBase64,
+            user_id: user._id,
+            crop: user.crop || 'unknown',
+            language: currentLang
+          })
+        });
+        const data = await res.json();
+        document.getElementById('scanning').classList.remove('show');
+        renderScanResult(data);
+      } catch(err) {
+        document.getElementById('scanning').classList.remove('show');
+        alert('Analysis failed: ' + err.message);
+      }
+    }
+
+    function renderScanResult(data) {
+      const t = translations[currentLang];
+      const card = document.getElementById('scan-result');
+
+      if (!data.is_valid_leaf) {
+        card.innerHTML = `
+          <div style="text-align:center; padding:20px;">
+            <div style="font-size:48px;">⚠️</div>
+            <h3 style="font-family:'Fraunces',serif; color:#991b1b; margin-top:10px;">Invalid Image</h3>
+            <p style="margin-top:10px; color:var(--text-muted);">${data.error_message || 'Please upload a clear photo of a crop leaf'}</p>
+            <button class="btn-scan-again" onclick="resetScan()">🔄 Try Again</button>
+          </div>
+        `;
+        card.classList.add('show');
+        return;
+      }
+
+      const confClass = 'conf-' + (data.confidence || 'moderate');
+      const sevClass = 'sev-' + (data.severity || 'none');
+      const isHealthy = (data.severity === 'none' || data.disease_name === 'healthy plant' ||
+                         (data.disease_name || '').toLowerCase().includes('healthy'));
+      const diseaseIcon = isHealthy ? '✅' : '🔬';
+
+      // Smart shop search using actual chemical name from AI response
+      const chemForShop = (data.chemical_remedy && data.chemical_remedy.name) || '';
+      const searchTerm = chemForShop
+        ? encodeURIComponent(chemForShop + ' pesticide shop')
+        : 'pesticide+agriculture+shop+near+me';
+      const mapsUrl = `https://www.google.com/maps/search/${searchTerm}/@${lat},${lon},13z`;
+
+      let html = `
+        <div class="disease-header">
+          <div class="disease-icon">${diseaseIcon}</div>
+          <div class="disease-name">
+            <h3>${data.disease_name_local || data.disease_name || 'Analysis'}</h3>
+            <div>
+              <span class="confidence-badge ${confClass}">${(data.confidence || 'moderate').toUpperCase()} CONFIDENCE</span>
+              <span class="severity-pill ${sevClass}">${(data.severity || 'none').toUpperCase()}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (data.description) {
+        html += `<div class="result-description">${data.description}</div>`;
+      }
+
+      if (data.symptoms && data.symptoms.length > 0) {
+        html += `<div style="margin-bottom:14px;">
+          <div style="font-weight:700; font-size:13px; margin-bottom:6px; color:var(--forest);">${t.result_symptoms}:</div>
+          <ul style="list-style:none; padding-left:0; font-size:12px; color:var(--text-dark);">
+            ${data.symptoms.map(s => `<li style="padding:3px 0;">• ${s}</li>`).join('')}
+          </ul>
+        </div>`;
+      }
+
+      if (!isHealthy && data.natural_remedy) {
+        const nr = data.natural_remedy;
+        html += `<div class="remedy-box natural">
+          <div class="remedy-header">${t.result_natural}: ${nr.name || ''}</div>
+          ${nr.ingredients ? `<div class="remedy-item"><strong>${t.result_ingredients}:</strong> ${nr.ingredients}</div>` : ''}
+          ${nr.application ? `<div class="remedy-item"><strong>${t.result_application}:</strong> ${nr.application}</div>` : ''}
+          ${nr.frequency ? `<div class="remedy-item"><strong>${t.result_frequency}:</strong> ${nr.frequency}</div>` : ''}
+        </div>`;
+      }
+
+      if (!isHealthy && data.chemical_remedy) {
+        const cr = data.chemical_remedy;
+        html += `<div class="remedy-box chemical">
+          <div class="remedy-header">${t.result_chemical}: ${cr.name || ''}</div>
+          ${cr.dosage ? `<div class="remedy-item"><strong>${t.result_dosage}:</strong> ${cr.dosage}</div>` : ''}
+          ${cr.application ? `<div class="remedy-item"><strong>${t.result_application}:</strong> ${cr.application}</div>` : ''}
+          ${cr.price_range ? `<div class="remedy-item"><strong>${t.result_price}:</strong> ${cr.price_range}</div>` : ''}
+          ${cr.caution ? `<div class="remedy-item" style="color:#991b1b;"><strong>${t.result_caution}:</strong> ${cr.caution}</div>` : ''}
+        </div>`;
+      }
+
+      if (data.prevention_tips && data.prevention_tips.length > 0) {
+        html += `<div style="margin-bottom:14px; padding:12px; background:#eff6ff; border-radius:8px;">
+          <div style="font-weight:700; font-size:13px; margin-bottom:6px; color:#1e40af;">${t.result_prevention}:</div>
+          <ul style="list-style:none; padding-left:0; font-size:12px;">
+            ${data.prevention_tips.map(t => `<li style="padding:3px 0;">• ${t}</li>`).join('')}
+          </ul>
+        </div>`;
+      }
+
+      if (!isHealthy) {
+        const shopLabel = chemForShop
+          ? `🛒 Find Shops Selling ${chemForShop.split(' ').slice(0,2).join(' ')}`
+          : t.result_find_shops;
+        html += `<a href="${mapsUrl}" target="_blank" class="btn-shops">${shopLabel}</a>`;
+        if (chemForShop) {
+          html += `<div style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:6px;">Searches for "${chemForShop}" near you</div>`;
+        }
+      }
+      html += `<button class="btn-scan-again" onclick="resetScan()">${t.result_scan_again}</button>`;
+
+      card.innerHTML = html;
+      card.classList.add('show');
+    }
+
+    function resetScan() {
+      currentImageBase64 = null;
+      document.getElementById('camera-input').value = '';
+      document.getElementById('gallery-input').value = '';
+      document.getElementById('image-preview').classList.remove('show');
+      document.getElementById('scan-result').classList.remove('show');
+      document.getElementById('upload-buttons').style.display = 'grid';
+    }
+
+    // PEST PREDICTION (grid-based)
+    let currentPestContext = null;
+    let pestChatHistory = [];
+
+    async function openPestPanel(label, cellData, stress) {
+      const t = translations[currentLang];
+      document.getElementById('pest-panel-title').textContent = label + ' Cell';
+      document.getElementById('pest-panel-subtitle').textContent = 'PEST PREDICTION';
+      document.getElementById('pest-panel-content').innerHTML = `
+        <div class="scanning show">
+          <div class="loader-big"></div>
+          <div class="text">${t.predict_loading}</div>
+        </div>
+      `;
+      document.getElementById('pest-backdrop').classList.add('show');
+      document.getElementById('pest-predict-panel').classList.add('show');
+      pestChatHistory = [];
+
+      try {
+        const res = await fetch('/api/predict-pest', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            cell_label: label,
+            cell_data: { cell: cellData, stress },
+            user_id: user._id,
+            language: currentLang
+          })
+        });
+        const data = await res.json();
+        currentPestContext = data;
+        renderPestPrediction(data);
+      } catch(err) {
+        document.getElementById('pest-panel-content').innerHTML = `
+          <div style="padding:20px; text-align:center; color:#991b1b;">Prediction failed: ${err.message}</div>
+        `;
+      }
+    }
+
+    function closePestPanel() {
+      document.getElementById('pest-backdrop').classList.remove('show');
+      document.getElementById('pest-predict-panel').classList.remove('show');
+      pestChatHistory = [];
+    }
+
+    function renderPestPrediction(data) {
+      const t = translations[currentLang];
+      const riskClass = 'risk-' + (data.risk_level || 'moderate');
+      const riskText = {
+        high: t.risk_high, moderate: t.risk_moderate, low: t.risk_low
+      }[data.risk_level] || t.risk_moderate;
+
+      const confClass = 'conf-' + (data.confidence || 'moderate');
+      const confText = (data.confidence || 'moderate').toUpperCase();
+
+      // Scenario detection
+      const scenario = data.scenario || 'critical_pest';
+      const isWater = scenario === 'water';
+      const isMild = scenario === 'mild_pest';
+      const isCritical = scenario === 'critical_pest';
+      const showChemical = isCritical && data.chemical_remedy;
+      const showShopMap = data.show_shop_map === true || isCritical;
+
+      // Scenario icons + labels
+      const scenarioInfo = {
+        water: { icon: '💧', label: 'Water Issue', color: '#2196f3' },
+        mild_pest: { icon: '🌿', label: 'Mild Pest (Organic Sufficient)', color: '#4caf50' },
+        critical_pest: { icon: '⚠️', label: 'Critical Pest', color: '#e53935' }
+      }[scenario] || { icon: '⚠️', label: 'Alert', color: '#e53935' };
+
+      // Extract chemical name
+      const chem = data.chemical_remedy || {};
+      const chemName = (typeof chem === 'object' && chem) ? (chem.chemical_name || chem.name || '') : (chem || '');
+      const searchQuery = chemName
+        ? encodeURIComponent(chemName + ' pesticide shop')
+        : 'pesticide+agriculture+shop+near+me';
+      const mapsUrl = `https://www.google.com/maps/search/${searchQuery}/@${lat},${lon},13z`;
+
+      // Natural remedy
+      const natural = data.natural_remedy || {};
+      const naturalName = typeof natural === 'object' ? (natural.name || 'Natural remedy') : natural;
+      const naturalRecipe = typeof natural === 'object' ? (natural.recipe || natural.ingredients || '') : '';
+      const naturalUse = typeof natural === 'object' ? (natural.how_to_use || natural.application || natural.method || '') : '';
+
+      // Chemical remedy (only if critical)
+      const chemDisplayName = typeof chem === 'object' ? (chem.chemical_name || chem.name || '') : chem;
+      const chemBrands = typeof chem === 'object' ? (chem.brand_names || '') : '';
+      const chemDosage = typeof chem === 'object' ? (chem.dosage || '') : '';
+      const chemPrice = typeof chem === 'object' ? (chem.price_range || '') : '';
+      const chemUse = typeof chem === 'object' ? (chem.how_to_use || chem.application || '') : '';
+
+      let html = `
+        <div style="padding: 16px;">
+          <!-- Scenario badge -->
+          <div style="background:${scenarioInfo.color}20; border-left:4px solid ${scenarioInfo.color}; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:600; color:var(--text-dark);">
+            ${scenarioInfo.icon} ${scenarioInfo.label}
+          </div>
+
+          <!-- Risk & Confidence -->
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+            <span class="risk-badge ${riskClass}">${riskText}</span>
+            <span class="confidence-badge ${confClass}" style="padding:6px 14px; font-size:11px;">
+              ${confText} CONFIDENCE
+            </span>
+          </div>
+
+          <!-- Primary threat -->
+          <div style="padding:14px; background:var(--cream); border-radius:10px; border-left:4px solid var(--earth); margin-bottom:12px;">
+            <div style="font-family:'Fraunces',serif; font-size:17px; font-weight:700; color:var(--forest);">
+              ${data.primary_threat || 'Analysis'}
+            </div>
+            <div style="font-size:13px; line-height:1.5; color:var(--text-dark); margin-top:6px;">
+              ${data.short_summary || data.description || ''}
+            </div>
+          </div>
+
+          ${data.key_reason ? `
+            <div style="font-size:12px; padding:10px; background:#eff6ff; border-radius:8px; margin-bottom:8px;">
+              <strong style="color:#1e40af;">💡 Why?</strong> ${data.key_reason}
+            </div>
+          ` : ''}
+
+          ${data.action_now ? `
+            <div style="font-size:12px; padding:10px; background:#fef3c7; border-radius:8px; border-left:3px solid #d97706; margin-bottom:12px;">
+              <strong style="color:#92400e;">⚡ Action Today:</strong> ${data.action_now}
+            </div>
+          ` : ''}
+
+          <!-- Natural remedy (always shown unless water scenario advice itself is the natural) -->
+          ${naturalName ? `
+            <div style="padding:12px; background:${isWater ? '#dbeafe' : '#f0fdf4'}; border:1px solid ${isWater ? '#60a5fa' : '#86efac'}; border-radius:10px; margin-bottom:10px;">
+              <div style="font-weight:700; font-size:13px; color:${isWater ? '#1e40af' : '#166534'}; margin-bottom:6px;">
+                ${isWater ? '💧 Irrigation Advice' : '🌿 Natural Remedy'}: ${naturalName}
+              </div>
+              ${naturalRecipe ? `<div style="font-size:12px; margin-bottom:4px;"><strong>${isWater ? 'Amount' : 'Recipe'}:</strong> ${naturalRecipe}</div>` : ''}
+              ${naturalUse ? `<div style="font-size:12px;"><strong>How:</strong> ${naturalUse}</div>` : ''}
+            </div>
+          ` : ''}
+
+          <!-- Chemical remedy (ONLY if critical pest) -->
+          ${showChemical && chemDisplayName ? `
+            <div style="padding:12px; background:#fef3c7; border:1px solid #fbbf24; border-radius:10px; margin-bottom:12px;">
+              <div style="font-weight:700; font-size:13px; color:#92400e; margin-bottom:6px;">
+                💊 Chemical Remedy: ${chemDisplayName}
+              </div>
+              ${chemBrands ? `<div style="font-size:12px; margin-bottom:4px;"><strong>Brands:</strong> ${chemBrands}</div>` : ''}
+              ${chemDosage ? `<div style="font-size:12px; margin-bottom:4px;"><strong>Dosage:</strong> ${chemDosage}</div>` : ''}
+              ${chemPrice ? `<div style="font-size:12px; margin-bottom:4px;"><strong>Price:</strong> ${chemPrice}</div>` : ''}
+              ${chemUse ? `<div style="font-size:12px;"><strong>How:</strong> ${chemUse}</div>` : ''}
+            </div>
+          ` : ''}
+
+          <!-- Mild pest notice (no chemical needed) -->
+          ${isMild ? `
+            <div style="padding:10px 12px; background:#ecfdf5; border:1px dashed #86efac; border-radius:8px; margin-bottom:12px; font-size:11px; color:#166534; text-align:center;">
+              ✅ Natural remedy is sufficient — no chemical needed at this stage
+            </div>
+          ` : ''}
+
+          <!-- Water scenario notice -->
+          ${isWater ? `
+            <div style="padding:10px 12px; background:#dbeafe; border:1px dashed #60a5fa; border-radius:8px; margin-bottom:12px; font-size:11px; color:#1e40af; text-align:center;">
+              💧 This is a water issue, not a pest — focus on irrigation
+            </div>
+          ` : ''}
+
+          <!-- Shop map (ONLY for critical pest) -->
+          ${showShopMap && chemName ? `
+            <a href="${mapsUrl}" target="_blank" class="btn-shops" style="display:block; text-align:center;">
+              🛒 Find Shops Selling ${chemName.split(' ').slice(0,2).join(' ')}
+            </a>
+            <div style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:6px;">
+              Searches for "${chemName}" near you
+            </div>
+          ` : ''}
+
+          <!-- Shop map disabled notice (non-critical) -->
+          ${!showShopMap ? `
+            <button disabled style="width:100%; padding:12px; background:#e5e7eb; color:#9ca3af; border:none; border-radius:10px; font-size:12px; font-weight:600; cursor:not-allowed; font-family:inherit;">
+              🛒 Shop Map (not needed for this issue)
+            </button>
+          ` : ''}
+
+          <!-- CHAT -->
+          <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
+            <div style="font-weight:700; font-size:13px; color:var(--forest); margin-bottom:10px;">
+              💬 Ask the Expert
+            </div>
+            <div id="pest-chat-messages" style="max-height:250px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:12px; padding:8px; background:#fafafa; border-radius:8px; min-height:80px;">
+              <div class="cell-msg cell" style="font-size:12px; padding:8px 12px;">
+                ${getChatWelcome(data)}
+              </div>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+              <button class="suggestion-chip" onclick="askPest('${getSuggestion1(data)}')">${getSuggestion1(data)}</button>
+              <button class="suggestion-chip" onclick="askPest('${getSuggestion2(data)}')">${getSuggestion2(data)}</button>
+              <button class="suggestion-chip" onclick="askPest('${getSuggestion3(data)}')">${getSuggestion3(data)}</button>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="pest-chat-input"
+                style="flex:1; background:var(--cream); border:1px solid var(--border); border-radius:20px; padding:8px 14px; font-size:12px; outline:none; font-family:inherit;"
+                placeholder="${getChatPlaceholder()}"
+                onkeydown="if(event.key==='Enter')sendPestMessage()"/>
+              <button onclick="sendPestMessage()" style="background:var(--earth); color:white; border:none; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px;">➤</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('pest-panel-content').innerHTML = html;
+    }
+
+    function getChatWelcome(data) {
+      const lang = currentLang;
+      if (lang === 'tamil') return `${data.primary_threat} பற்றி மேலும் தெரிந்துகொள்ள வேண்டுமா? கேளுங்கள்!`;
+      if (lang === 'tanglish') return `${data.primary_threat} pathi innum edhavathu kelvi iruntha kelunga!`;
+      return `Want to know more about ${data.primary_threat}? Ask me anything!`;
+    }
+
+    function getSuggestion1(data) {
+      if (currentLang === 'tamil') return 'இது எப்படி பரவுகிறது?';
+      if (currentLang === 'tanglish') return 'Epdi paravum?';
+      return 'How does it spread?';
+    }
+    function getSuggestion2(data) {
+      if (currentLang === 'tamil') return 'மருந்து எப்போது அடிக்க வேண்டும்?';
+      if (currentLang === 'tanglish') return 'Marundhu eppo adikanum?';
+      return 'When to spray?';
+    }
+    function getSuggestion3(data) {
+      if (currentLang === 'tamil') return 'மற்ற பயிர்களுக்கு ஆபத்தா?';
+      if (currentLang === 'tanglish') return 'Other crops ku apathaa?';
+      return 'Risk to other crops?';
+    }
+    function getChatPlaceholder() {
+      if (currentLang === 'tamil') return 'உங்கள் கேள்வியை கேளுங்கள்...';
+      if (currentLang === 'tanglish') return 'Unga kelvi kelunga...';
+      return 'Ask your question...';
+    }
+
+    function askPest(text) {
+      document.getElementById('pest-chat-input').value = text;
+      sendPestMessage();
+    }
+
+    async function sendPestMessage() {
+      const input = document.getElementById('pest-chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const container = document.getElementById('pest-chat-messages');
+
+      // User message
+      const userMsg = document.createElement('div');
+      userMsg.className = 'cell-msg user';
+      userMsg.style.cssText = 'font-size:12px; padding:8px 12px;';
+      userMsg.textContent = text;
+      container.appendChild(userMsg);
+      pestChatHistory.push({ role: 'user', content: text });
+
+      input.value = '';
+      container.scrollTop = container.scrollHeight;
+
+      // Typing indicator
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'cell-msg cell typing';
+      typingDiv.style.cssText = 'font-size:12px; padding:8px 12px;';
+      typingDiv.textContent = '...';
+      container.appendChild(typingDiv);
+      container.scrollTop = container.scrollHeight;
+
+      try {
+        const res = await fetch('/api/pest-chat', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            question: text,
+            context: currentPestContext,
+            history: pestChatHistory.slice(-6),
+            language: currentLang
+          })
+        });
+        const data = await res.json();
+
+        typingDiv.remove();
+
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'cell-msg cell';
+        aiMsg.style.cssText = 'font-size:12px; padding:8px 12px;';
+        aiMsg.textContent = data.answer || 'Sorry, try again.';
+        container.appendChild(aiMsg);
+        container.scrollTop = container.scrollHeight;
+
+        pestChatHistory.push({ role: 'assistant', content: data.answer });
+
+        // Voice playback
+        speakText(data.answer);
+      } catch(err) {
+        typingDiv.remove();
+      }
+    }
+
+    // Voice output (TTS) in selected language
+    function speakText(text) {
+      if (!window.speechSynthesis) return;
+      try {
+        window.speechSynthesis.cancel();  // stop any previous
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voiceLangMap = { english: 'en-IN', tanglish: 'en-IN', tamil: 'ta-IN' };
+        utterance.lang = voiceLangMap[currentLang] || 'en-IN';
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } catch(e) { /* ignore TTS errors */ }
+    }
+  </script>
+</body>
+</html>

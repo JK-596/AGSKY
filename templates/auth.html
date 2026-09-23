@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AGSKY — Sign In</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}"/>
+</head>
+
+<body>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="left">
+      <div class="logo" onclick="window.location.href='/'">⬡ AGSKY</div>
+    </div>
+    <div class="lang-selector">
+      <button class="lang-btn" data-lang="english">EN</button>
+      <button class="lang-btn" data-lang="tamil">தமிழ்</button>
+    </div>
+  </div>
+
+  <!-- AUTH PAGE -->
+  <div class="auth-wrap">
+    <div class="auth-card">
+
+      <div class="auth-header">
+        <div class="icon">🌾</div>
+        <h1 data-i18n="auth_welcome">Welcome to AGSKY</h1>
+        <div class="tagline" data-i18n="auth_tagline">Your AI farming assistant</div>
+      </div>
+
+      <!-- Tab switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-signin" onclick="switchTab('signin')" data-i18n="sign_in">Sign In</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')" data-i18n="sign_up">Sign Up</button>
+      </div>
+
+      <!-- Message area -->
+      <div class="auth-message" id="auth-message"></div>
+
+      <!-- ─── SIGN IN FORM ─── -->
+      <form class="auth-form active" id="form-signin" onsubmit="return handleSignIn(event)">
+        <div class="input-group">
+          <label data-i18n="phone">Phone Number</label>
+          <input type="tel" id="signin-phone" required maxlength="10" pattern="[0-9]{10}" data-i18n-placeholder="phone_placeholder" placeholder="10 digit phone"/>
+        </div>
+
+        <div class="input-group">
+          <label data-i18n="password">Password</label>
+          <input type="password" id="signin-password" required data-i18n-placeholder="password_placeholder" placeholder="Your password"/>
+        </div>
+
+        <button type="submit" class="btn-submit" data-i18n="sign_in">Sign In</button>
+
+        <div class="auth-switch">
+          <span data-i18n="no_account">Don't have an account?</span>
+          <a onclick="switchTab('signup')" data-i18n="sign_up">Sign Up</a>
+        </div>
+      </form>
+
+      <!-- ─── SIGN UP FORM ─── -->
+      <form class="auth-form" id="form-signup" onsubmit="return handleSignUp(event)">
+
+        <div class="section-header">👤 <span data-i18n="sign_up">Your Details</span></div>
+
+        <div class="input-group">
+          <label data-i18n="name">Name</label>
+          <input type="text" id="signup-name" required data-i18n-placeholder="name_placeholder" placeholder="Your full name"/>
+        </div>
+
+        <div class="input-group">
+          <label data-i18n="phone">Phone Number</label>
+          <input type="tel" id="signup-phone" required maxlength="10" pattern="[0-9]{10}" data-i18n-placeholder="phone_placeholder" placeholder="10 digit phone"/>
+        </div>
+
+        <div class="input-group">
+          <label data-i18n="password">Password</label>
+          <input type="password" id="signup-password" required minlength="4" data-i18n-placeholder="password_placeholder" placeholder="Choose a password"/>
+        </div>
+
+        <div class="section-header">🌾 <span data-i18n="your_farm">Farm Details</span></div>
+
+        <!-- Land Type Radio -->
+        <label style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.8px; display:block; margin-bottom:6px;" data-i18n="land_type">Land Type</label>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="land_type" value="nanjai" onchange="updateCropOptions()" required/>
+            <div class="radio-label">
+              <span data-i18n="nanjai">Nanjai</span>
+              <span class="sub-text">Wetland</span>
+            </div>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="land_type" value="punjai" onchange="updateCropOptions()" required/>
+            <div class="radio-label">
+              <span data-i18n="punjai">Punjai</span>
+              <span class="sub-text">Dryland</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Crop dropdown -->
+        <div class="input-group">
+          <label data-i18n="crop">Crop</label>
+          <select id="signup-crop" required disabled>
+            <option value="" data-i18n="select_crop">Select your crop</option>
+          </select>
+        </div>
+
+        <!-- Days since planting -->
+        <div class="input-group">
+          <label data-i18n="days_planted">Days since planting</label>
+          <input type="number" id="signup-days" required min="0" max="365" data-i18n-placeholder="days_placeholder" placeholder="e.g. 30"/>
+        </div>
+
+        <button type="submit" class="btn-submit" data-i18n="create_account">Create Account</button>
+
+        <div class="auth-switch">
+          <span data-i18n="have_account">Already have an account?</span>
+          <a onclick="switchTab('signin')" data-i18n="sign_in">Sign In</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/translations.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/shared.js') }}"></script>
+
+  <script>
+    // ─── Tab switching ───
+    function switchTab(tab) {
+      document.getElementById('tab-signin').classList.toggle('active', tab === 'signin');
+      document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+      document.getElementById('form-signin').classList.toggle('active', tab === 'signin');
+      document.getElementById('form-signup').classList.toggle('active', tab === 'signup');
+      hideMessage();
+    }
+
+    // ─── Update crop dropdown based on land type ───
+    function updateCropOptions() {
+      const landType = document.querySelector('input[name="land_type"]:checked')?.value;
+      const cropSelect = document.getElementById('signup-crop');
+
+      if (!landType) {
+        cropSelect.disabled = true;
+        return;
+      }
+
+      const crops = getCropsForLandType(landType);
+      cropSelect.disabled = false;
+      cropSelect.innerHTML = `<option value="">${t('select_crop')}</option>` +
+        crops.map(c => {
+          const name = window.AGSKY_LANG === 'tamil' ? c.name_ta : c.name_en;
+          return `<option value="${c.id}">${name}</option>`;
+        }).join('');
+    }
+
+    // ─── Re-run on language change ───
+    window.onLanguageChange = function(lang) {
+      if (document.querySelector('input[name="land_type"]:checked')) {
+        updateCropOptions();
+      }
+    };
+
+    // ─── Messages ───
+    function showMessage(text, type) {
+      const el = document.getElementById('auth-message');
+      el.textContent = text;
+      el.className = 'auth-message show ' + type;
+    }
+    function hideMessage() {
+      document.getElementById('auth-message').classList.remove('show');
+    }
+
+    // ─── SIGN IN ───
+    async function handleSignIn(e) {
+      e.preventDefault();
+      hideMessage();
+
+      const phone    = document.getElementById('signin-phone').value.trim();
+      const password = document.getElementById('signin-password').value;
+
+      if (!/^\d{10}$/.test(phone)) {
+        showMessage(window.AGSKY_LANG === 'tamil' ? 'சரியான phone number கொடுங்க' : 'Enter valid 10-digit phone', 'error');
+        return false;
+      }
+
+      const result = await api('/api/signin', {
+        method: 'POST',
+        body: { phone, password }
+      });
+
+      if (result.error || !result.success) {
+        showMessage(result.error || (window.AGSKY_LANG === 'tamil' ? 'Login தோல்வி' : 'Login failed'), 'error');
+        return false;
+      }
+
+      saveCurrentUser(result.user);
+      showMessage(window.AGSKY_LANG === 'tamil' ? '✅ வெற்றி! Checking your farm...' : '✅ Success! Checking your farm...', 'success');
+
+      // Check if user has cached dashboard data
+      try {
+        const cachedRes = await fetch('/api/cached-dashboard/' + result.user._id);
+        const cachedData = await cachedRes.json();
+
+        if (cachedData.has_cache) {
+          // User has saved farm → go direct to dashboard
+          sessionStorage.setItem('agsky_lat',   cachedData.lat);
+          sessionStorage.setItem('agsky_lon',   cachedData.lon);
+          sessionStorage.setItem('agsky_acres', cachedData.acres);
+          sessionStorage.setItem('agsky_session_id', cachedData.session_id);
+          sessionStorage.setItem('agsky_use_cache', 'true');
+          setTimeout(() => window.location.href = '/dashboard', 600);
+        } else {
+          // No cached farm → must pick location first
+          setTimeout(() => window.location.href = '/map', 600);
+        }
+      } catch (err) {
+        // Fallback to map page
+        setTimeout(() => window.location.href = '/map', 600);
+      }
+
+      return false;
+    }
+
+    // ─── SIGN UP ───
+    async function handleSignUp(e) {
+      e.preventDefault();
+      hideMessage();
+
+      const name      = document.getElementById('signup-name').value.trim();
+      const phone     = document.getElementById('signup-phone').value.trim();
+      const password  = document.getElementById('signup-password').value;
+      const landType  = document.querySelector('input[name="land_type"]:checked')?.value;
+      const crop      = document.getElementById('signup-crop').value;
+      const days      = parseInt(document.getElementById('signup-days').value);
+
+      if (!/^\d{10}$/.test(phone)) {
+        showMessage(window.AGSKY_LANG === 'tamil' ? 'சரியான phone number கொடுங்க' : 'Enter valid 10-digit phone', 'error');
+        return false;
+      }
+
+      if (!landType || !crop) {
+        showMessage(window.AGSKY_LANG === 'tamil' ? 'எல்லாம் fill பண்ணுங்க' : 'Please fill all fields', 'error');
+        return false;
+      }
+
+      const result = await api('/api/signup', {
+        method: 'POST',
+        body: { name, phone, password, land_type: landType, crop, days_planted: days }
+      });
+
+      if (result.error || !result.success) {
+        showMessage(result.error || 'Signup failed', 'error');
+        return false;
+      }
+
+      saveCurrentUser(result.user);
+      showMessage(window.AGSKY_LANG === 'tamil' ? '✅ கணக்கு உருவாக்கப்பட்டது!' : '✅ Account created!', 'success');
+      setTimeout(() => window.location.href = '/map', 800);
+      return false;
+    }
+
+    // ─── If already logged in, check cached data ───
+    (async function() {
+      const user = getCurrentUser();
+      if (!user) return;
+
+      try {
+        const res = await fetch('/api/cached-dashboard/' + user._id);
+        const data = await res.json();
+        if (data.has_cache) {
+          sessionStorage.setItem('agsky_lat',   data.lat);
+          sessionStorage.setItem('agsky_lon',   data.lon);
+          sessionStorage.setItem('agsky_acres', data.acres);
+          sessionStorage.setItem('agsky_session_id', data.session_id);
+          sessionStorage.setItem('agsky_use_cache', 'true');
+          window.location.href = '/dashboard';
+        } else {
+          window.location.href = '/map';
+        }
+      } catch(e) {
+        window.location.href = '/map';
+      }
+    })();
+  </script>
+
+</body>
+</html>

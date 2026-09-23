@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AGSKY — Select Farm Location</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Segoe UI', 'Noto Sans Tamil', sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      background: #111;
+      border-bottom: 1px solid #1f1f1f;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topbar .left  { display:flex; align-items:center; gap:16px; }
+    .topbar .logo  { font-size:16px; font-weight:700; color:#4caf50; letter-spacing:1.5px; cursor:pointer; }
+    .topbar .step  { font-size:12px; color:#666; }
+
+    .lang-selector { display:flex; gap:6px; }
+    .lang-btn {
+      background:transparent; border:1px solid #2a2a2a; color:#888;
+      padding:5px 12px; border-radius:16px; font-size:11px;
+      cursor:pointer; transition:all 0.2s;
+    }
+    .lang-btn:hover   { border-color:#4caf50; color:#fff; }
+    .lang-btn.active  { background:#4caf50; color:#000; border-color:#4caf50; }
+
+    /* ── MAIN ── */
+    .main { display:flex; flex:1; overflow:hidden; position:relative; }
+    #map  { flex:1; cursor:crosshair; }
+
+    /* ── SIDE PANEL (smaller - only essentials) ── */
+    .panel {
+      width:320px; background:#111;
+      border-left:1px solid #1f1f1f;
+      display:flex; flex-direction:column;
+      overflow-y:auto;
+    }
+    .panel-section {
+      padding:18px 20px;
+      border-bottom:1px solid #1f1f1f;
+    }
+    .panel-section h3 {
+      font-size:11px; text-transform:uppercase;
+      letter-spacing:1.5px; color:#4caf50; margin-bottom:12px;
+      display:flex; align-items:center; gap:6px;
+    }
+    .step-num {
+      width:20px; height:20px; background:#4caf50; color:#000;
+      border-radius:50%; display:inline-flex; align-items:center;
+      justify-content:center; font-size:11px; font-weight:700;
+    }
+
+    .hint {
+      font-size:12px; color:#888; text-align:center;
+      padding:20px 10px; line-height:1.5;
+    }
+    .hint.active { color:#ffa726; }
+    .hint.confirmed { color:#4caf50; }
+
+    /* Big "Check location" button */
+    .btn-check {
+      width:100%; padding:14px; background:#ffa726; color:#000;
+      border:none; border-radius:8px; font-size:13px; font-weight:700;
+      cursor:pointer; letter-spacing:0.5px;
+      transition:all 0.2s;
+      display:none; align-items:center; justify-content:center; gap:8px;
+      margin-top:8px;
+    }
+    .btn-check.show { display:flex; }
+    .btn-check:hover { background:#fb8c00; }
+
+    /* Confirmed box */
+    .confirmed-box {
+      background:rgba(76,175,80,0.08); border:1px solid #4caf50;
+      border-radius:8px; padding:12px 14px;
+      display:none;
+    }
+    .confirmed-box.show { display:block; }
+    .confirmed-box .title {
+      font-size:12px; font-weight:700; color:#4caf50;
+      margin-bottom:6px;
+    }
+    .confirmed-box .coords {
+      font-size:11px; color:#aaa; font-family:monospace; line-height:1.5;
+    }
+    .btn-change {
+      margin-top:10px; width:100%; padding:8px;
+      background:transparent; border:1px solid #2a2a2a;
+      color:#888; border-radius:5px; font-size:11px;
+      cursor:pointer; transition:all 0.2s;
+    }
+    .btn-change:hover { border-color:#888; color:#fff; }
+
+    /* Acres section */
+    .input-group { display:flex; flex-direction:column; gap:8px; }
+    .input-group label { font-size:11px; color:#888; }
+    .input-group input {
+      background:#0a0a0a; border:1px solid #2a2a2a; border-radius:8px;
+      padding:11px 14px; color:#fff; font-size:14px;
+      outline:none; transition:border 0.2s;
+    }
+    .input-group input:focus { border-color:#4caf50; }
+
+    .btn-primary {
+      width:100%; padding:12px; background:#4caf50; color:#000;
+      border:none; border-radius:8px; font-size:13px; font-weight:700;
+      cursor:pointer; margin-top:12px; letter-spacing:0.5px;
+      transition:all 0.2s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .btn-primary:hover    { background:#43a047; transform:translateY(-1px); }
+    .btn-primary:disabled { background:#2a2a2a; color:#555; cursor:not-allowed; transform:none; }
+
+    .pin-marker {
+      width:16px; height:16px; background:#ffa726;
+      border:3px solid white; border-radius:50%;
+      box-shadow: 0 0 0 4px rgba(255,167,38,0.3);
+    }
+    .pin-marker.confirmed {
+      background:#4caf50;
+      box-shadow: 0 0 0 4px rgba(76,175,80,0.3);
+    }
+
+    /* ═══ CENTER MODAL (overlay on map) ═══ */
+    .modal-overlay {
+      position:fixed; inset:0;
+      background:rgba(0,0,0,0.75); backdrop-filter:blur(4px);
+      z-index:2000; display:none;
+      align-items:center; justify-content:center;
+      animation:fadeIn 0.25s ease-out;
+    }
+    .modal-overlay.show { display:flex; }
+    @keyframes fadeIn {
+      from { opacity:0; }
+      to   { opacity:1; }
+    }
+
+    .modal-card {
+      background:#111; border:1px solid #2a2a2a;
+      border-radius:16px; padding:24px;
+      width:90%; max-width:480px;
+      box-shadow:0 30px 80px rgba(0,0,0,0.7);
+      animation:slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp {
+      from { transform:translateY(30px); opacity:0; }
+      to   { transform:translateY(0); opacity:1; }
+    }
+
+    /* Loading inside modal */
+    .modal-loading {
+      text-align:center; padding:60px 20px;
+    }
+    .modal-loading .loader-big {
+      width:48px; height:48px;
+      border:4px solid #2a2a2a; border-top-color:#4caf50;
+      border-radius:50%; animation:spin 1s linear infinite;
+      margin:0 auto 20px;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .modal-loading .text {
+      font-size:14px; color:#888;
+    }
+
+    /* AI Guess Badge */
+    .modal-ai-badge {
+      padding:14px 20px; border-radius:10px;
+      font-size:18px; font-weight:800;
+      text-align:center; margin-bottom:16px;
+      letter-spacing:1px;
+    }
+    .modal-ai-badge.farmland { background:rgba(76,175,80,0.15); color:#4caf50; border:2px solid #4caf50; }
+    .modal-ai-badge.water    { background:rgba(33,150,243,0.15); color:#2196f3; border:2px solid #2196f3; }
+    .modal-ai-badge.urban    { background:rgba(255,167,38,0.15); color:#ffa726; border:2px solid #ffa726; }
+    .modal-ai-badge.forest   { background:rgba(129,199,132,0.15); color:#81c784; border:2px solid #81c784; }
+    .modal-ai-badge.mixed    { background:rgba(158,158,158,0.15); color:#bbb; border:2px solid #9e9e9e; }
+
+    /* Satellite image — BIG and clear */
+    .modal-image-wrap {
+      position:relative;
+      width:100%; aspect-ratio:1;
+      max-width:400px; margin:0 auto;
+      border-radius:12px; overflow:hidden;
+      border:3px solid #2a2a2a;
+      background:#050505;
+    }
+    .modal-image-wrap img {
+      width:100%; height:100%; display:block; object-fit:cover;
+      image-rendering:auto;
+    }
+    /* Red crosshair */
+    .modal-image-wrap::before,
+    .modal-image-wrap::after {
+      content:''; position:absolute;
+      background:#ff0040; box-shadow:0 0 6px rgba(0,0,0,0.8);
+      pointer-events:none; z-index:2;
+    }
+    .modal-image-wrap::before {
+      left:50%; top:42%; width:3px; height:16%;
+      transform:translateX(-50%);
+    }
+    .modal-image-wrap::after {
+      left:42%; top:50%; width:16%; height:3px;
+      transform:translateY(-50%);
+    }
+    .modal-image-wrap .center-dot {
+      position:absolute; left:50%; top:50%;
+      transform:translate(-50%,-50%);
+      width:14px; height:14px; background:#ff0040;
+      border:3px solid white; border-radius:50%;
+      box-shadow:0 0 10px rgba(0,0,0,0.8);
+      pointer-events:none; z-index:3;
+    }
+
+    .modal-scale {
+      font-size:11px; color:#666; text-align:center;
+      margin:12px 0 20px;
+    }
+
+    .modal-question {
+      font-size:18px; color:#fff; font-weight:700;
+      text-align:center; margin:20px 0 16px;
+      padding-top:16px; border-top:1px solid #2a2a2a;
+    }
+
+    .modal-actions {
+      display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    }
+    .btn-modal-reject, .btn-modal-confirm {
+      padding:14px; border:none; border-radius:8px;
+      font-size:14px; font-weight:700; cursor:pointer;
+      transition:all 0.2s;
+    }
+    .btn-modal-reject {
+      background:#2a1515; color:#e53935;
+      border:1px solid #3a1a1a;
+    }
+    .btn-modal-reject:hover { background:#3a1515; color:#fff; border-color:#e53935; }
+    .btn-modal-confirm {
+      background:#4caf50; color:#000;
+    }
+    .btn-modal-confirm:hover { background:#43a047; }
+
+    /* ── FLOATING CHATBOT ── */
+    .chat-fab {
+      position:fixed; bottom:24px; right:24px;
+      width:56px; height:56px; border-radius:50%;
+      background:linear-gradient(135deg, #4caf50, #43a047);
+      border:none; cursor:pointer; font-size:24px;
+      box-shadow:0 10px 30px rgba(76, 175, 80, 0.4);
+      z-index:1000; transition:all 0.3s;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .chat-fab:hover { transform:scale(1.1); }
+    .chat-fab.hidden { display:none; }
+
+    .chat-panel {
+      position:fixed; bottom:24px; right:24px;
+      width:360px; height:500px; background:#111;
+      border:1px solid #1f1f1f; border-radius:16px;
+      z-index:1000; display:none; flex-direction:column;
+      overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    }
+    .chat-panel.show { display:flex; }
+    .chat-header {
+      padding:14px 16px; background:#1a1a1a; border-bottom:1px solid #1f1f1f;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .chat-header .title { font-size:13px; font-weight:700; color:#4caf50; display:flex; align-items:center; gap:6px; }
+    .chat-header .close {
+      background:transparent; border:none; color:#666; cursor:pointer;
+      font-size:20px; width:24px; height:24px;
+    }
+    .chat-messages {
+      flex:1; overflow-y:auto; padding:14px;
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .msg {
+      max-width:80%; padding:10px 12px; border-radius:12px;
+      font-size:12px; line-height:1.5; white-space:pre-wrap;
+    }
+    .msg.user { background:#4caf50; color:#000; align-self:flex-end; border-bottom-right-radius:4px; }
+    .msg.bot  { background:#1a1a1a; color:#e0e0e0; align-self:flex-start; border-bottom-left-radius:4px; }
+    .msg.typing { color:#666; font-style:italic; }
+    .chat-input-area { padding:12px; border-top:1px solid #1f1f1f; display:flex; gap:8px; }
+    .chat-input-area input {
+      flex:1; background:#0a0a0a; border:1px solid #2a2a2a;
+      border-radius:20px; padding:8px 14px; color:#fff;
+      font-size:12px; outline:none;
+    }
+    .chat-input-area input:focus { border-color:#4caf50; }
+    .chat-input-area button {
+      background:#4caf50; color:#000; border:none;
+      width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:14px;
+    }
+    .chat-input-area .mic-btn { background:#2a2a2a; color:#fff; }
+    .chat-input-area .mic-btn.recording { background:#e53935; }
+  </style>
+</head>
+
+<body>
+
+  <div class="topbar">
+    <div class="left">
+      <div class="logo" onclick="window.location.href='/'">⬡ AGSKY</div>
+      <div class="step" id="step-label">Step 1 of 2 — Select Location</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="background:rgba(255,255,255,0.1); color:#f5f0e8; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600;">
+        👤 <span id="user-name-map">User</span>
+      </div>
+      <button onclick="logoutUser()" style="background:rgba(229,57,53,0.2); border:1px solid rgba(229,57,53,0.4); color:#ffcdd2; padding:6px 14px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer;">
+        🚪 Logout
+      </button>
+      <div class="lang-selector">
+        <button class="lang-btn active" data-lang="english">EN</button>
+        <button class="lang-btn" data-lang="tamil">தமிழ்</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="map"></div>
+
+    <!-- CENTER MODAL for preview -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal-card">
+
+        <!-- Loading state -->
+        <div class="modal-loading" id="modal-loading">
+          <div class="loader-big"></div>
+          <div class="text" id="modal-loading-text">Analyzing location...</div>
+        </div>
+
+        <!-- Preview state - TEXT ONLY ADVISORY -->
+        <div class="modal-preview" id="modal-preview" style="display:none;">
+
+          <div class="modal-ai-badge" id="modal-ai-badge">🌾 FARMLAND</div>
+
+          <!-- Advisory text card -->
+          <div id="modal-advisory" style="background:#0f0f0f; border:1px solid #2a2a2a; border-radius:12px; padding:18px 20px; margin-bottom:16px; line-height:1.7; font-size:14px; color:#e0e0e0;">
+            <div id="advisory-content"></div>
+          </div>
+
+          <!-- Technical metrics (small, secondary) -->
+          <div id="modal-metrics" style="background:#0a0a0a; border-radius:6px; padding:8px 12px; font-size:10px; color:#666; font-family:monospace; margin-bottom:16px; line-height:1.6;"></div>
+
+          <div class="modal-question" id="modal-question">Is this your farm? 🤔</div>
+
+          <div class="modal-actions">
+            <button class="btn-modal-reject" onclick="rejectLocation()">
+              <span id="modal-reject-text">✗ No, Wrong</span>
+            </button>
+            <button class="btn-modal-confirm" onclick="confirmLocation()">
+              <span id="modal-confirm-text">✓ Yes, My Farm</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <div class="panel">
+
+      <!-- Step 1: Location -->
+      <div class="panel-section">
+        <h3><span class="step-num">1</span> <span id="sec1-title">Farm Location</span></h3>
+
+        <p class="hint" id="hint-text">👆 Click on your farm location on the map</p>
+
+        <button class="btn-check" id="btn-check" onclick="runPreview()">
+          <span>🛰️</span>
+          <span id="check-text">Check This Location</span>
+        </button>
+
+        <div class="confirmed-box" id="confirmed-box">
+          <div class="title" id="confirmed-title">✅ Farm Location Confirmed</div>
+          <div class="coords" id="confirmed-coords"></div>
+          <button class="btn-change" onclick="rejectLocation()">
+            <span id="change-text">Change Location</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Acres -->
+      <div class="panel-section">
+        <h3><span class="step-num">2</span> <span id="sec2-title">Farm Size</span></h3>
+        <div class="input-group">
+          <label id="acres-label">TOTAL AREA (ACRES)</label>
+          <input type="number" id="acres-input" placeholder="Confirm location first" min="0.1" step="0.1" disabled/>
+        </div>
+        <button class="btn-primary" id="analyze-btn" disabled onclick="startAnalysis()">
+          <span id="analyze-btn-text">Analyze My Farm</span>
+          <span>→</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CHATBOT -->
+  <button class="chat-fab" id="chat-fab" onclick="toggleChat()">💬</button>
+  <div class="chat-panel" id="chat-panel">
+    <div class="chat-header">
+      <div class="title">🤖 <span id="chat-title">AGSKY Assistant</span></div>
+      <button class="close" onclick="toggleChat()">×</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg bot" id="chat-welcome">Hi! Ask me anything about farming 🌾</div>
+    </div>
+    <div class="chat-input-area">
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">🎤</button>
+      <input type="text" id="chat-input" placeholder="Type your question..." onkeydown="if(event.key==='Enter')sendChat()"/>
+      <button onclick="sendChat()">➤</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+  <script>
+    // ── AUTH CHECK — redirect to /auth if not logged in ──
+    const userData = localStorage.getItem('agsky_user');
+    if (!userData) {
+      window.location.href = '/auth';
+    }
+
+    // Show user name in topbar
+    try {
+      const user = JSON.parse(userData);
+      if (user && user.name) {
+        document.getElementById('user-name-map').textContent = user.name.split(' ')[0];
+      }
+    } catch(e) {}
+
+    // Logout function
+    function logoutUser() {
+      if (confirm('Logout pannaraa? / Logout?')) {
+        localStorage.removeItem('agsky_user');
+        sessionStorage.clear();
+        window.location.href = '/auth';
+      }
+    }
+
+    const translations = {
+      english: {
+        step_label: "Step 1 of 2 — Select Location",
+        sec1_title: "Farm Location",
+        sec2_title: "Farm Size",
+        acres_label:"TOTAL AREA (ACRES)",
+        hint_click: "👆 Click on your farm location on the map",
+        hint_marked: "📍 Location marked — tap Check to verify",
+        hint_confirmed: "✅ Location confirmed — enter acres →",
+        check_btn: "Check This Location",
+        loading: "Loading satellite image...",
+        analyze_btn:"Analyze My Farm",
+        chat_title: "AGSKY Assistant",
+        chat_welcome: "Hi! Ask me anything about farming 🌾",
+        chat_placeholder: "Type your question...",
+        search_placeholder: "Search location...",
+        question: "Is this your farm? 🤔",
+        scale_text: "📏 1 km × 1 km area • 🔴 Your click point",
+        guess_farmland: "FARMLAND",
+        guess_water: "WATER BODY",
+        guess_urban: "URBAN / ROAD",
+        guess_barren: "BARREN LAND",
+        guess_forest: "FOREST",
+        guess_mixed: "UNCERTAIN",
+        confirm_btn: "✓ Yes, My Farm",
+        reject_btn:  "✗ No, Wrong",
+        confirmed_title: "✅ Farm Location Confirmed",
+        change_btn: "Change Location",
+        acres_placeholder_disabled: "Confirm location first",
+        acres_placeholder_enabled: "e.g. 5"
+      },
+      tamil: {
+        step_label: "படி 1 of 2 — இடம் தேர்ந்தெடுக்கவும்",
+        sec1_title: "பண்ணை இடம்",
+        sec2_title: "பண்ணை அளவு",
+        acres_label:"மொத்த பரப்பு (ஏக்கர்)",
+        hint_click: "👆 வரைபடத்தில் உங்கள் பண்ணை இடத்தில் click செய்யுங்க",
+        hint_marked: "📍 இடம் mark ஆச்சு — Check button தட்டுங்க",
+        hint_confirmed: "✅ இடம் உறுதி — ஏக்கர் enter பண்ணுங்க →",
+        check_btn: "இந்த இடத்தை சரிபார்",
+        loading: "செயற்கைக்கோள் படம் load ஆகுது...",
+        analyze_btn:"என் பண்ணையை பகுப்பாய்வு செய்",
+        chat_title: "AGSKY உதவியாளர்",
+        chat_welcome: "வணக்கம்! விவசாயம் பற்றி எதையும் கேக்கலாம் 🌾",
+        chat_placeholder: "கேள்வியை type பண்ணுங்க...",
+        search_placeholder: "இடத்தை தேடுங்க...",
+        question: "இது உங்க பண்ணையா? 🤔",
+        scale_text: "📏 1 கிமீ × 1 கிமீ பகுதி • 🔴 உங்கள் click இடம்",
+        guess_farmland: "பண்ணை",
+        guess_water: "நீர்நிலை",
+        guess_urban: "நகரம்/சாலை",
+        guess_barren: "பாழ் நிலம்",
+        guess_forest: "காடு",
+        guess_mixed: "தெளிவில்லை",
+        confirm_btn: "✓ ஆமா, என் பண்ணை",
+        reject_btn:  "✗ இல்ல, தவறு",
+        confirmed_title: "✅ பண்ணை இடம் உறுதி",
+        change_btn: "இடத்தை மாற்று",
+        acres_placeholder_disabled: "முதல்ல இடம் confirm பண்ணுங்க",
+        acres_placeholder_enabled: "உதா. 5"
+      },
+      hindi: {
+        step_label: "चरण 1 of 2 — स्थान चुनें",
+        sec1_title: "खेत का स्थान",
+        sec2_title: "खेत का आकार",
+        acres_label:"कुल क्षेत्रफल (एकड़)",
+        hint_click: "👆 नक्शे पर अपने खेत पर क्लिक करें",
+        hint_marked: "📍 स्थान चिह्नित — Check बटन दबाएं",
+        hint_confirmed: "✅ स्थान पुष्टि — एकड़ डालें →",
+        check_btn: "इस स्थान की जांच करें",
+        loading: "सैटेलाइट छवि लोड हो रही है...",
+        analyze_btn:"मेरे खेत का विश्लेषण करें",
+        chat_title: "AGSKY सहायक",
+        chat_welcome: "नमस्ते! खेती के बारे में पूछें 🌾",
+        chat_placeholder: "प्रश्न लिखें...",
+        search_placeholder: "स्थान खोजें...",
+        question: "क्या यह आपका खेत है? 🤔",
+        scale_text: "📏 1 किमी × 1 किमी क्षेत्र • 🔴 आपका क्लिक",
+        guess_farmland: "खेत",
+        guess_water: "जल निकाय",
+        guess_urban: "शहर / सड़क",
+        guess_barren: "बंजर भूमि",
+        guess_forest: "वन",
+        guess_mixed: "अनिश्चित",
+        confirm_btn: "✓ हाँ, मेरा खेत",
+        reject_btn:  "✗ नहीं, गलत",
+        confirmed_title: "✅ खेत की पुष्टि",
+        change_btn: "स्थान बदलें",
+        acres_placeholder_disabled: "पहले स्थान पुष्टि करें",
+        acres_placeholder_enabled: "जैसे 5"
+      },
+      telugu: {
+        step_label: "దశ 1 of 2 — స్థలం ఎంచుకోండి",
+        sec1_title: "వ్యవసాయ స్థలం",
+        sec2_title: "వ్యవసాయ పరిమాణం",
+        acres_label:"మొత్తం ప్రాంతం (ఎకరాలు)",
+        hint_click: "👆 మ్యాప్‌లో మీ పొలంపై క్లిక్ చేయండి",
+        hint_marked: "📍 స్థలం మార్క్ — Check బటన్ నొక్కండి",
+        hint_confirmed: "✅ స్థలం నిర్ధారణ — ఎకరాలు ఎంటర్ →",
+        check_btn: "ఈ స్థలాన్ని తనిఖీ చేయండి",
+        loading: "ఉపగ్రహ చిత్రం లోడ్ అవుతోంది...",
+        analyze_btn:"నా వ్యవసాయాన్ని విశ్లేషించండి",
+        chat_title: "AGSKY సహాయకుడు",
+        chat_welcome: "నమస్తే! వ్యవసాయం గురించి అడగండి 🌾",
+        chat_placeholder: "ప్రశ్న టైప్ చేయండి...",
+        search_placeholder: "స్థలాన్ని శోధించండి...",
+        question: "ఇది మీ పొలమా? 🤔",
+        scale_text: "📏 1 కిమీ × 1 కిమీ ప్రాంతం • 🔴 మీ క్లిక్",
+        guess_farmland: "వ్యవసాయ భూమి",
+        guess_water: "నీటి వనరు",
+        guess_urban: "పట్టణం / రోడ్డు",
+        guess_barren: "బంజరు భూమి",
+        guess_forest: "అడవి",
+        guess_mixed: "అనిశ్చితం",
+        confirm_btn: "✓ అవును, నా పొలం",
+        reject_btn:  "✗ కాదు, తప్పు",
+        confirmed_title: "✅ వ్యవసాయ భూమి నిర్ధారించబడింది",
+        change_btn: "స్థలం మార్చండి",
+        acres_placeholder_disabled: "ముందు స్థలం నిర్ధారించండి",
+        acres_placeholder_enabled: "ఉదా. 5"
+      }
+    };
+
+    let currentLang = localStorage.getItem('agsky_lang') || 'english';
+
+    function applyLanguage(lang) {
+      const t = translations[lang];
+      if (!t) return;
+      document.getElementById('step-label').textContent = t.step_label;
+      document.getElementById('sec1-title').textContent = t.sec1_title;
+      document.getElementById('sec2-title').textContent = t.sec2_title;
+      document.getElementById('acres-label').textContent = t.acres_label;
+      document.getElementById('check-text').textContent = t.check_btn;
+      document.getElementById('modal-loading-text').textContent = t.loading;
+      document.getElementById('analyze-btn-text').textContent = t.analyze_btn;
+      document.getElementById('chat-title').textContent = t.chat_title;
+      document.getElementById('chat-welcome').textContent = t.chat_welcome;
+      document.getElementById('chat-input').placeholder = t.chat_placeholder;
+      document.getElementById('modal-confirm-text').textContent = t.confirm_btn;
+      document.getElementById('modal-reject-text').textContent = t.reject_btn;
+      document.getElementById('modal-question').textContent = t.question;
+      document.getElementById('modal-scale').textContent = t.scale_text;
+      document.getElementById('confirmed-title').textContent = t.confirmed_title;
+      document.getElementById('change-text').textContent = t.change_btn;
+
+      updateHint();
+
+      const acresInput = document.getElementById('acres-input');
+      acresInput.placeholder = acresInput.disabled
+        ? t.acres_placeholder_disabled
+        : t.acres_placeholder_enabled;
+
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+      });
+      localStorage.setItem('agsky_lang', lang);
+      currentLang = lang;
+    }
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
+    });
+
+    // ── MAP with LAYER TOGGLE ──
+    const map = L.map('map', { center:[20.5937, 78.9629], zoom:5, minZoom:3, maxZoom: 18 });
+
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'© OpenStreetMap', maxZoom:18
+    });
+    const satLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { attribution:'© Esri', maxZoom:18 }
+    );
+
+    // Start with satellite view
+    satLayer.addTo(map);
+    let mapMode = 'satellite';
+
+    // Toggle button (top-left after zoom controls)
+    const MapToggleControl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function() {
+        const div = L.DomUtil.create('div', 'leaflet-bar');
+        div.innerHTML = `
+          <button id="map-toggle-btn" style="
+            background:white; border:none; padding:8px 12px;
+            font-size:12px; font-weight:600; cursor:pointer;
+            width:auto; height:34px; display:flex; align-items:center; gap:6px;
+            font-family:'Plus Jakarta Sans',sans-serif;">
+            🗺️ <span id="map-mode-text">Map</span>
+          </button>
+        `;
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      }
+    });
+    new MapToggleControl().addTo(map);
+
+    // Handler (attach after DOM update)
+    setTimeout(() => {
+      const btn = document.getElementById('map-toggle-btn');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          if (mapMode === 'satellite') {
+            map.removeLayer(satLayer);
+            osmLayer.addTo(map);
+            mapMode = 'osm';
+            document.getElementById('map-mode-text').textContent = 'Satellite';
+            btn.innerHTML = '🛰️ <span id="map-mode-text">Satellite</span>';
+          } else {
+            map.removeLayer(osmLayer);
+            satLayer.addTo(map);
+            mapMode = 'satellite';
+            document.getElementById('map-mode-text').textContent = 'Map';
+            btn.innerHTML = '🗺️ <span id="map-mode-text">Map</span>';
+          }
+        });
+      }
+    }, 200);
+
+    // ── SMART SEARCH: geocode + lat/long paste support ──
+    const geocoder = L.Control.geocoder({
+      defaultMarkGeocode: false,
+      placeholder: 'Search or paste lat,long...'
+    }).on('markgeocode', function(e) {
+      const { center } = e.geocode;
+      map.setView(center, 16);
+      markLocation(center.lat, center.lng);
+    }).addTo(map);
+
+    // Hook into the search input for lat/long detection
+    setTimeout(() => {
+      const searchInput = document.querySelector('.leaflet-control-geocoder-form input');
+      if (searchInput) {
+        searchInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            const val = this.value.trim();
+            // Detect lat,long pattern: "11.0168, 76.9558" or "11.0168 76.9558"
+            const coordPattern = /^-?\d+\.?\d*\s*[,\s]\s*-?\d+\.?\d*$/;
+            if (coordPattern.test(val)) {
+              const parts = val.split(/[,\s]+/).map(s => parseFloat(s.trim()));
+              const lat = parts[0];
+              const lon = parts[1];
+              if (!isNaN(lat) && !isNaN(lon) &&
+                  lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                e.preventDefault();
+                e.stopPropagation();
+                map.setView([lat, lon], 16);
+                markLocation(lat, lon);
+                this.value = '';
+                return false;
+              }
+            }
+            // Otherwise let geocoder handle address search
+          }
+        });
+      }
+    }, 500);
+
+    // ── STATE ──
+    // 'initial' → 'marked' → 'confirmed'
+    let state = 'initial';
+    let tempLat = null, tempLon = null;
+    let confirmedLat = null, confirmedLon = null;
+    let marker = null;
+
+    function updateHint() {
+      const hint = document.getElementById('hint-text');
+      const t = translations[currentLang];
+      if (state === 'initial') {
+        hint.textContent = t.hint_click;
+        hint.className = 'hint';
+      } else if (state === 'marked') {
+        hint.textContent = t.hint_marked;
+        hint.className = 'hint active';
+      } else if (state === 'confirmed') {
+        hint.textContent = t.hint_confirmed;
+        hint.className = 'hint confirmed';
+      }
+    }
+
+    function setState(newState) {
+      state = newState;
+      const t = translations[currentLang];
+      const checkBtn = document.getElementById('btn-check');
+      const confirmedBox = document.getElementById('confirmed-box');
+      const acresInput = document.getElementById('acres-input');
+      const hintEl = document.getElementById('hint-text');
+
+      checkBtn.classList.remove('show');
+      confirmedBox.classList.remove('show');
+
+      if (state === 'initial') {
+        hintEl.style.display = 'block';
+        acresInput.disabled = true;
+        acresInput.value = '';
+        acresInput.placeholder = t.acres_placeholder_disabled;
+      } else if (state === 'marked') {
+        hintEl.style.display = 'block';
+        checkBtn.classList.add('show');
+        acresInput.disabled = true;
+      } else if (state === 'confirmed') {
+        hintEl.style.display = 'block';
+        confirmedBox.classList.add('show');
+        acresInput.disabled = false;
+        acresInput.placeholder = t.acres_placeholder_enabled;
+        acresInput.focus();
+      }
+
+      updateHint();
+      checkAnalyzeReady();
+    }
+
+    // ── Click map → mark pin (NO API call) ──
+    map.on('click', e => markLocation(e.latlng.lat, e.latlng.lng));
+
+    function markLocation(lat, lon) {
+      tempLat = lat;
+      tempLon = lon;
+
+      // Center + zoom to click point
+      map.setView([lat, lon], Math.max(map.getZoom(), 16), { animate: true });
+
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lon], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="pin-marker"></div>',
+          iconSize:[16,16], iconAnchor:[8,8]
+        })
+      }).addTo(map);
+
+      setState('marked');
+    }
+
+    // ── User clicks "Check" → Show modal, fetch satellite ──
+    async function runPreview() {
+      if (!tempLat || !tempLon) return;
+
+      // Show modal in loading state
+      const overlay = document.getElementById('modal-overlay');
+      const loading = document.getElementById('modal-loading');
+      const preview = document.getElementById('modal-preview');
+
+      overlay.classList.add('show');
+      loading.style.display = 'block';
+      preview.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/validate-land', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ lat: tempLat, lon: tempLon })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          alert('Error: ' + data.error);
+          overlay.classList.remove('show');
+          return;
+        }
+
+        // Switch to preview state
+        loading.style.display = 'none';
+        preview.style.display = 'block';
+        showPreview(data);
+
+      } catch (err) {
+        alert('Network error: ' + err.message);
+        overlay.classList.remove('show');
+      }
+    }
+
+    function showPreview(data) {
+      const t = translations[currentLang];
+
+      // AI badge
+      const badge = document.getElementById('modal-ai-badge');
+      badge.className = 'modal-ai-badge';
+      const guesses = {
+        farmland: { text: '🌾 ' + t.guess_farmland, cls: 'farmland' },
+        water:    { text: '💧 ' + t.guess_water,    cls: 'water' },
+        urban:    { text: '🏢 ' + t.guess_urban,    cls: 'urban' },
+        barren:   { text: '🏜️ ' + t.guess_barren,   cls: 'urban' },
+        forest:   { text: '🌳 ' + t.guess_forest,   cls: 'forest' },
+        mixed:    { text: '❓ ' + t.guess_mixed,    cls: 'mixed' },
+        unknown:  { text: '❓ ' + t.guess_mixed,    cls: 'mixed' }
+      };
+      const g = guesses[data.land_type] || guesses.mixed;
+      badge.textContent = g.text;
+      badge.classList.add(g.cls);
+
+      // ── BUILD TEXT ADVISORY (rule-based, no AI) ──
+      const m = data.metrics || {};
+      const ndvi = m.core_ndvi ?? 0;
+      const ndwi = m.core_ndwi ?? 0;
+      const isTamil = currentLang === 'tamil';
+
+      let advisory = '';
+      const lt = data.land_type;
+
+      if (lt === 'water') {
+        advisory = isTamil
+          ? `💧 <b>இந்த இடத்தில் அதிக நீர் உள்ளது</b><br><br>
+             • NDWI = ${ndwi} (high water signature)<br>
+             • NDVI = ${ndvi} (no vegetation)<br><br>
+             இது pond, river, அல்லது canal மாதிரி இருக்கு. 
+             உங்கள் farmland இல்லாம irrigation source ஆக இருக்க கூடும். 
+             மீண்டும் check பண்ணுங்க — இது உங்க farm area தானா?`
+          : `💧 <b>High water content at this location</b><br><br>
+             • NDWI = ${ndwi} (strong water signature)<br>
+             • NDVI = ${ndvi} (no vegetation)<br><br>
+             This looks like a pond, river, or canal. 
+             It may be an irrigation source rather than your farmland. 
+             Please verify — is this really your farm area?`;
+      }
+      else if (lt === 'forest') {
+        advisory = isTamil
+          ? `🌳 <b>Dense vegetation / trees detected</b><br><br>
+             • NDVI = ${ndvi} (very high)<br>
+             • Low variance (uniform canopy)<br><br>
+             இது forest/plantation மாதிரி theriyudhu — coconut, banana, 
+             அல்லது mango orchard ஆக இருக்கலாம். Normal crop field-la 
+             இப்படி uniform-ah dense-ah இருக்காது. Confirm பண்ணுங்க.`
+          : `🌳 <b>Dense tree cover / plantation detected</b><br><br>
+             • NDVI = ${ndvi} (very high)<br>
+             • Low variance (uniform canopy)<br><br>
+             This looks like forest or a plantation — possibly coconut, banana, 
+             or mango trees. Regular crops don't show this uniform density. 
+             Confirm if this is your area.`;
+      }
+      else if (lt === 'urban' || lt === 'barren') {
+        advisory = isTamil
+          ? `🏢 <b>Vegetation இல்லாத area</b><br><br>
+             • NDVI = ${ndvi} (very low)<br>
+             • No crop detected<br><br>
+             இது road, building, அல்லது bare ground மாதிரி இருக்கு. 
+             Crop இல்லாத edathai mark பண்ணாலும் analysis useful-ah iraakaathu. 
+             உங்க farm area-la click பண்ணுங்க.`
+          : `🏢 <b>No vegetation found</b><br><br>
+             • NDVI = ${ndvi} (very low)<br>
+             • No crops detected<br><br>
+             This looks like a road, building, or bare ground. 
+             Analyzing a non-crop area won't give useful results. 
+             Please click on your actual farm area.`;
+      }
+      else if (lt === 'farmland') {
+        advisory = isTamil
+          ? `🌾 <b>Crop vegetation detected!</b><br><br>
+             • NDVI = ${ndvi} (moderate-to-good vegetation)<br>
+             • NDWI = ${ndwi}<br><br>
+             இது farmland மாதிரி theriyudhu — crop iruku, patchy pattern 
+             fields matathiri iruku. Confirm பண்ணினா analysis start panrom.`
+          : `🌾 <b>Crop vegetation detected!</b><br><br>
+             • NDVI = ${ndvi} (moderate-to-healthy vegetation)<br>
+             • NDWI = ${ndwi}<br><br>
+             This looks like farmland — vegetation present with field-like patchiness. 
+             Confirm and we'll start the analysis.`;
+      }
+      else {
+        advisory = isTamil
+          ? `❓ <b>Mixed/unclear area</b><br><br>
+             • NDVI = ${ndvi}<br>
+             • NDWI = ${ndwi}<br><br>
+             இந்த area unclear-ah iruku. Crop-ah, road-ah, water-ah theriyala. 
+             Zoom in panni clear-ah farm patch-la click பண்ணுங்க.`
+          : `❓ <b>Mixed/unclear area</b><br><br>
+             • NDVI = ${ndvi}<br>
+             • NDWI = ${ndwi}<br><br>
+             This area is unclear. Can't tell if it's crop, road, or water. 
+             Zoom in and click on a clearer farm patch.`;
+      }
+
+      document.getElementById('advisory-content').innerHTML = advisory;
+
+      // Small technical metrics
+      document.getElementById('modal-metrics').innerHTML = `
+        📊 NDVI: ${m.core_ndvi ?? '—'} • NDWI: ${m.core_ndwi ?? '—'} • EVI: ${m.center_ndvi ?? '—'}<br>
+        📸 ${m.image_count || 0} satellite images • ${Math.round(m.cloud_cover || 0)}% cloud
+      `;
+    }
+
+    // ── Confirm → commit lat/lon ──
+    function confirmLocation() {
+      confirmedLat = tempLat;
+      confirmedLon = tempLon;
+
+      if (marker) {
+        marker.getElement().querySelector('.pin-marker').classList.add('confirmed');
+      }
+
+      document.getElementById('modal-overlay').classList.remove('show');
+      document.getElementById('confirmed-coords').innerHTML = `
+        📍 ${confirmedLat.toFixed(6)}°, ${confirmedLon.toFixed(6)}°
+      `;
+
+      setState('confirmed');
+    }
+
+    // ── Reject → reset ──
+    function rejectLocation() {
+      tempLat = null; tempLon = null;
+      confirmedLat = null; confirmedLon = null;
+      if (marker) { map.removeLayer(marker); marker = null; }
+
+      document.getElementById('modal-overlay').classList.remove('show');
+      setState('initial');
+    }
+
+    // Acres input
+    document.getElementById('acres-input').addEventListener('input', checkAnalyzeReady);
+
+    function checkAnalyzeReady() {
+      const acres = parseFloat(document.getElementById('acres-input').value);
+      const ready = confirmedLat !== null && confirmedLon !== null && acres > 0;
+      document.getElementById('analyze-btn').disabled = !ready;
+    }
+
+    function startAnalysis() {
+      const acres = parseFloat(document.getElementById('acres-input').value);
+      if (!confirmedLat || !acres) return;
+
+      sessionStorage.setItem('agsky_lat', confirmedLat);
+      sessionStorage.setItem('agsky_lon', confirmedLon);
+      sessionStorage.setItem('agsky_acres', acres);
+      sessionStorage.setItem('agsky_lang', currentLang);
+      sessionStorage.removeItem('agsky_use_cache');  // Fresh analysis
+      sessionStorage.removeItem('agsky_session_id');
+
+      window.location.href = '/dashboard';
+    }
+
+    // ── Chatbot ──
+    function toggleChat() {
+      document.getElementById('chat-panel').classList.toggle('show');
+      document.getElementById('chat-fab').classList.toggle('hidden');
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const text  = input.value.trim();
+      if (!text) return;
+      addMessage(text, 'user');
+      input.value = '';
+      const typingId = addMessage('...', 'bot', true);
+      try {
+        const res = await fetch('/api/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ question:text, language:currentLang })
+        });
+        const data = await res.json();
+        removeMessage(typingId);
+        addMessage(data.answer || 'Error', 'bot');
+      } catch (err) {
+        removeMessage(typingId);
+        addMessage('Network error', 'bot');
+      }
+    }
+
+    let msgCounter = 0;
+    function addMessage(text, type, isTyping=false) {
+      const container = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = 'msg ' + type + (isTyping ? ' typing' : '');
+      div.id = 'msg-' + (++msgCounter);
+      div.textContent = text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return div.id;
+    }
+    function removeMessage(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    // Voice
+    let recognition = null;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+    }
+    const langMap = { english:'en-IN', tamil:'ta-IN', hindi:'hi-IN', telugu:'te-IN' };
+
+    function toggleMic() {
+      if (!recognition) { alert('Voice not supported'); return; }
+      const btn = document.getElementById('mic-btn');
+      if (btn.classList.contains('recording')) { recognition.stop(); return; }
+      recognition.lang = langMap[currentLang] || 'en-IN';
+      btn.classList.add('recording');
+      recognition.onresult = function(event) {
+        document.getElementById('chat-input').value = event.results[0][0].transcript;
+        btn.classList.remove('recording');
+        sendChat();
+      };
+      recognition.onerror = recognition.onend = function() { btn.classList.remove('recording'); };
+      recognition.start();
+    }
+
+    // Init
+    applyLanguage(currentLang);
+    setState('initial');
+  </script>
+
+</body>
+</html>
